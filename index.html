@@ -138,6 +138,14 @@ code{font-size:15px;background:var(--surface-2);padding:1px 5px;border-radius:5p
 @keyframes shake{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
 .remind .when{font-family:var(--display);font-size:40px;font-weight:800;line-height:1;color:var(--accent)}
 .remind .ev{font-size:18px;text-align:left;padding:10px 12px}
+.lists{display:grid;grid-template-columns:280px minmax(0,1fr);gap:16px;align-items:start}
+.lnav{display:flex;flex-direction:column;gap:6px}
+.lnav button.lbtn{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:12px 14px;min-height:52px;font-weight:700}
+.lnav button.lbtn[aria-current="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.lnav button.lbtn .n{margin-left:auto;font-weight:400;font-size:14px;opacity:.8;font-variant-numeric:tabular-nums}
+.bar{height:8px;border-radius:99px;background:var(--surface-2);overflow:hidden;margin:6px 0 4px}
+.bar i{display:block;height:100%;background:var(--good)}
+@media (max-width:860px){.lists{grid-template-columns:1fr}.lnav{flex-direction:row;flex-wrap:wrap}.lnav button.lbtn{width:auto}}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(24px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:999px;z-index:60;font-weight:700;max-width:calc(100% - 32px)}
 .swatches{display:flex;gap:8px;flex-wrap:wrap}
 .swatches button{width:36px;height:36px;border-radius:50%;border:3px solid transparent;background:var(--mc)}
@@ -164,6 +172,7 @@ code{font-size:15px;background:var(--surface-2);padding:1px 5px;border-radius:5p
     <button class="tab" data-view="taches" aria-current="page"><svg viewBox="0 0 24 24"><path d="M4 12l5 5L20 6"/></svg>Tâches</button>
     <button class="tab" data-view="courses"><svg viewBox="0 0 24 24"><path d="M3 4h2l2.4 11h11L21 7H6.2"/><circle cx="9" cy="19.5" r="1.3"/><circle cx="17" cy="19.5" r="1.3"/></svg>Courses</button>
     <button class="tab" data-view="todo"><svg viewBox="0 0 24 24"><rect x="4" y="3.5" width="16" height="17" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>À faire</button>
+    <button class="tab" data-view="listes"><svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 5.5l1 1 2-2M4 11.5l1 1 2-2M4 17.5l1 1 2-2"/></svg>Listes</button>
     <button class="tab" data-view="agenda"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Agenda</button>
     <button class="tab" data-view="reglages"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg>Réglages</button>
     <div class="spacer"></div>
@@ -261,6 +270,20 @@ code{font-size:15px;background:var(--surface-2);padding:1px 5px;border-radius:5p
       <div class="card" id="todoDoneCard" hidden>
         <div class="row" style="margin-bottom:8px"><h2 class="grow">Fait</h2><button class="btn ghost" id="todoClear" type="button">Effacer</button></div>
         <div id="todoDone"></div>
+      </div>
+    </section>
+
+    <!-- LISTES -->
+    <section class="view" id="v-listes">
+      <div class="lists">
+        <div class="lnav">
+          <div id="listNav" class="lnav"></div>
+          <form class="add" id="newListForm" style="margin-top:6px">
+            <input type="text" id="newListName" placeholder="Nouvelle liste…" required maxlength="40" style="flex:1 1 140px">
+            <button class="btn" type="submit">Créer</button>
+          </form>
+        </div>
+        <div class="card" id="listCard"></div>
       </div>
     </section>
 
@@ -363,8 +386,8 @@ code{font-size:15px;background:var(--surface-2);padding:1px 5px;border-radius:5p
 (function(){
 
 const COLORS = ["#3A7BD5","#D9544D","#2E9E6A","#9B59B6","#E08A1E","#1FA2A8","#C2477F","#6B7A8F"];
-const COLLS = ["members","chores","completions","rewards","shopping","todos","events"];
-const S = {members:[],chores:[],completions:[],rewards:[],shopping:[],todos:[],events:[]};
+const COLLS = ["members","chores","completions","rewards","shopping","todos","events","lists"];
+const S = {members:[],chores:[],completions:[],rewards:[],shopping:[],todos:[],events:[],lists:[]};
 let db = null, mcp = null, view = "taches", weekOffset = 0, pickedColor = COLORS[0];
 
 
@@ -417,7 +440,7 @@ function tick(){
 tick(); setInterval(tick, 20000);
 
 /* ---------- navigation ---------- */
-const TITLES = {taches:"Tâches & points", courses:"Liste de courses", todo:"À faire en famille", agenda:"Agenda familial", reglages:"Réglages"};
+const TITLES = {taches:"Tâches & points", courses:"Liste de courses", todo:"À faire en famille", listes:"Listes", agenda:"Agenda familial", reglages:"Réglages"};
 function go(v){
   view = v;
   document.querySelectorAll(".tab[data-view]").forEach(b => b.dataset.view === v ? b.setAttribute("aria-current","page") : b.removeAttribute("aria-current"));
@@ -647,6 +670,59 @@ document.addEventListener("click", e => {
   const d = e.target.closest("[data-deltodo]"); if(d){ del("todos", d.dataset.deltodo); }
 });
 
+/* ---------- listes (vacances, valises…) ---------- */
+let curList = null; try { curList = localStorage.getItem("maisonnee.list"); } catch(e){}
+const sortedLists = () => [...S.lists].sort((a,b) => (a.order ?? 0) - (b.order ?? 0) || a.at - b.at);
+function renderListes(){
+  const ls = sortedLists();
+  if(!ls.some(l => l.id === curList)) curList = ls[0] ? ls[0].id : null;
+  $("#listNav").innerHTML = ls.map(l => { const it = l.items || []; const d = it.filter(i => i.done).length;
+    return `<button class="lbtn" type="button" data-list="${esc(l.id)}" aria-current="${l.id === curList}">${esc(l.name)}<span class="n">${d}/${it.length}</span></button>`; }).join("");
+  const l = ls.find(x => x.id === curList), card = $("#listCard");
+  if(!l){ card.innerHTML = `<h2>Aucune liste</h2><p class="muted">Créez une liste à gauche : vacances, valise, pique-nique…</p>`; return; }
+  const items = l.items || [], done = items.filter(i => i.done).length;
+  const keep = document.activeElement && document.activeElement.id === "itemText" ? $("#itemText").value : null;
+  card.innerHTML = `<div class="row"><h2 class="grow">${esc(l.name)}</h2>
+      <button class="btn ghost" type="button" id="listRename">Renommer</button>
+      <button class="btn danger" type="button" id="listDelete">Supprimer</button></div>
+    <div class="bar"><i style="width:${items.length ? Math.round(100*done/items.length) : 0}%"></i></div>
+    <div class="small muted">${items.length ? `${done} sur ${items.length} prêt${done > 1 ? "s" : ""}` : "Liste vide"}</div>
+    <form class="add" id="itemForm" style="margin:14px 0 6px"><input type="text" id="itemText" placeholder="Ajouter (ex. maillots de bain)" required maxlength="80"><button class="btn" type="submit">Ajouter</button></form>
+    <div>${items.map(i => `<div class="item${i.done ? " done" : ""}">
+      <button class="check" type="button" data-litem="${esc(i.id)}" aria-label="Cocher ${esc(i.text)}"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg></button>
+      <div class="t">${esc(i.text)}</div><button class="icon-btn" type="button" data-dellitem="${esc(i.id)}" aria-label="Supprimer">×</button></div>`).join("") || `<div class="empty">Ajoutez les choses à ne pas oublier.</div>`}</div>
+    <div class="row" style="margin-top:14px">
+      <button class="btn ghost" type="button" id="listUncheck" ${done ? "" : "disabled"}>Tout décocher (pour la prochaine fois)</button>
+      <button class="btn ghost" type="button" id="listMail" ${items.length ? "" : "disabled"}>Envoyer par e-mail</button>
+      ${navigator.share ? `<button class="btn ghost" type="button" id="listShare" ${items.length ? "" : "disabled"}>Partager</button>` : ""}
+    </div>`;
+  if(keep !== null){ $("#itemText").value = keep; $("#itemText").focus(); }
+  const saveItems = its => patch("lists", l.id, {items: its});
+  $("#itemForm").onsubmit = async e => { e.preventDefault(); const t = $("#itemText").value.trim(); if(!t) return;
+    $("#itemText").value = ""; await saveItems([...items, {id: uid(), text: t, done: false}]); $("#itemText").focus(); };
+  $("#listUncheck").onclick = () => saveItems(items.map(i => ({...i, done: false})));
+  $("#listDelete").onclick = () => confirmBox(`Supprimer la liste « ${l.name} » ?`, "Supprimer", () => del("lists", l.id));
+  $("#listRename").onclick = () => {
+    const ov = modal(`<h2>Renommer la liste</h2><input type="text" id="renameIn" maxlength="40" value="${esc(l.name)}"><div class="row"><button class="btn" type="button" id="renameOk">Enregistrer</button><button class="btn ghost" type="button" data-close>Annuler</button></div>`);
+    ov.querySelector("#renameOk").onclick = () => { const v = ov.querySelector("#renameIn").value.trim(); if(v){ closeModal(); patch("lists", l.id, {name: v}); } };
+  };
+  const text = () => l.name + "\n\n" + items.map(i => (i.done ? "[x] " : "[ ] ") + i.text).join("\n") + "\n";
+  $("#listMail").onclick = () => { let to = ""; try { to = localStorage.getItem("maisonnee.mailto") || ""; } catch(e){}
+    location.href = "mailto:" + encodeURIComponent(to).replace(/%40/g, "@") + "?subject=" + encodeURIComponent(l.name) + "&body=" + encodeURIComponent(text()); };
+  if($("#listShare")) $("#listShare").onclick = () => navigator.share({title: l.name, text: text()}).catch(() => {});
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-list]"); if(b){ curList = b.dataset.list; try { localStorage.setItem("maisonnee.list", curList); } catch(err){} renderListes(); return; }
+  const l = S.lists.find(x => x.id === curList); if(!l) return;
+  const c = e.target.closest("[data-litem]"); if(c){ patch("lists", l.id, {items: (l.items || []).map(i => i.id === c.dataset.litem ? {...i, done: !i.done} : i)}); return; }
+  const d = e.target.closest("[data-dellitem]"); if(d){ patch("lists", l.id, {items: (l.items || []).filter(i => i.id !== d.dataset.dellitem)}); }
+});
+$("#newListForm").addEventListener("submit", async e => {
+  e.preventDefault(); const name = $("#newListName").value.trim(); if(!name) return;
+  const id = uid();
+  if(await put("lists", id, {name, items: [], order: S.lists.length, at: Date.now()})){ $("#newListName").value = ""; curList = id; try { localStorage.setItem("maisonnee.list", id); } catch(err){} renderListes(); }
+});
+
 /* ---------- agenda (Google Agenda intégré) ---------- */
 let calMode = "WEEK", lastCalUrl = "";
 try { calMode = localStorage.getItem("maisonnee.calmode") || "WEEK"; } catch(e){}
@@ -835,7 +911,7 @@ function renderAll(){
   fillSelect($("#choreMember"), "N'importe qui");
   fillSelect($("#todoMember"), "Qui veut");
   fillSelect($("#penMember"), "Pour qui ?");
-  renderTaches(); renderCourses(); renderTodo(); renderAgenda(); renderReglages(); if(typeof renderCtrl === "function") renderCtrl(); if(typeof renderGsSettings === "function") renderGsSettings();
+  renderTaches(); renderCourses(); renderTodo(); renderListes(); renderAgenda(); renderReglages(); if(typeof renderCtrl === "function") renderCtrl(); if(typeof renderGsSettings === "function") renderGsSettings();
 }
 let raf = 0;
 const scheduleRender = () => { if(!raf) raf = requestAnimationFrame(() => { raf = 0; renderAll(); }); };
@@ -876,6 +952,17 @@ try {
     const rw = {r1:{title:"30 min d'écran en plus", cost:30}, r2:{title:"Choisir le dessert du dimanche", cost:50}, r3:{title:"Choisir le film du vendredi soir", cost:80}, r4:{title:"Sortie au choix (cinéma, piscine…)", cost:200}};
     localStorage.setItem("maisonnee.db.rewards", JSON.stringify(rw));
     localStorage.setItem("maisonnee.init", "1");
+  }
+  if(!localStorage.getItem("maisonnee.lists.init")){
+    const mk = (name, order, its) => ({name, order, at: Date.now() + order, items: its.map((t, k) => ({id: "i" + order + "_" + k, text: t, done: false}))});
+    const cur = JSON.parse(localStorage.getItem("maisonnee.db.lists") || "{}");
+    Object.assign(cur, {
+      l1: mk("Vacances", 0, ["Réserver l'hébergement", "Vérifier les papiers d'identité", "Arroser les plantes / prévenir les voisins", "Charger les tablettes et téléphones", "Préparer le trajet (péage, carburant)"]),
+      l2: mk("Valise Tixie", 1, []),
+      l3: mk("Valise enfants", 2, ["Pyjamas", "Brosses à dents", "Sous-vêtements", "Doudous", "Chargeurs"])
+    });
+    localStorage.setItem("maisonnee.db.lists", JSON.stringify(cur));
+    localStorage.setItem("maisonnee.lists.init", "1");
   }
   for(const name of COLLS) db.collection(name).onSnapshot(snap => { S[name] = snap.docs.map(d => ({id:d.id, ...d.data()})); scheduleRender(); });
   if(navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
