@@ -298,6 +298,11 @@ code{font-size:15px;background:var(--surface-2);padding:1px 5px;border-radius:5p
         <p class="small muted" style="margin:8px 0 0;text-align:center">Touchez un repas pour l'inscrire ou le modifier.</p>
       </div>
       <div class="menuweek" id="menuWeek"></div>
+      <details class="card" id="dishCard">
+        <summary style="cursor:pointer;font-family:var(--display);font-weight:700;font-size:21px">Repas déjà faits <span class="muted" id="dishCount"></span></summary>
+        <p class="small muted" style="margin:8px 0">Chaque repas inscrit est gardé ici. Quand vous remplissez une case, vous pouvez le choisir dans la liste déroulante au lieu de le retaper.</p>
+        <div id="dishList"></div>
+      </details>
     </section>
 
     <!-- LISTES -->
@@ -716,7 +721,34 @@ function renderMenus(){
     </div>`;
   }
   $("#menuWeek").innerHTML = html;
+  renderDishes();
 }
+function hiddenDishes(){ try { return JSON.parse(localStorage.getItem("maisonnee.dishes.hidden") || "[]"); } catch(e){ return []; } }
+const dishKey = t => norm(t).replace(/\s+/g, " ");
+function pastDishes(){
+  const hid = new Set(hiddenDishes()), map = new Map();
+  for(const m of S.menus) for(const k of ["midi", "soir"]){
+    const t = (m[k] || "").trim(); if(!t) continue;
+    const key = dishKey(t); if(hid.has(key)) continue;
+    const cur = map.get(key) || {text: t, count: 0, last: ""};
+    cur.count++; if(m.id > cur.last){ cur.last = m.id; cur.text = t; }
+    map.set(key, cur);
+  }
+  return [...map.values()].sort((a, b) => b.count - a.count || b.last.localeCompare(a.last) || a.text.localeCompare(b.text));
+}
+function renderDishes(){
+  const ds = pastDishes();
+  $("#dishCount").textContent = ds.length ? "(" + ds.length + ")" : "";
+  $("#dishList").innerHTML = ds.length ? ds.map(d => `<div class="item"><div class="t" style="white-space:pre-line">${esc(d.text)}<div class="small muted">${d.count} fois · dernière fois le ${esc(new Date(d.last + "T12:00").toLocaleDateString("fr-FR", {day:"numeric", month:"long"}))}</div></div>
+      <button class="icon-btn" type="button" data-forget="${esc(dishKey(d.text))}" aria-label="Retirer de la liste">×</button></div>`).join("")
+    : `<div class="empty">Les repas inscrits dans la semaine apparaîtront ici.</div>`;
+}
+document.addEventListener("click", e => {
+  const f = e.target.closest("[data-forget]"); if(!f) return;
+  const h = hiddenDishes(); h.push(f.dataset.forget);
+  try { localStorage.setItem("maisonnee.dishes.hidden", JSON.stringify(h)); } catch(err){}
+  renderDishes(); toast("Retiré de la liste des repas");
+});
 $("#mnPrev").onclick = () => { menuOffset--; renderMenus(); };
 $("#mnNext").onclick = () => { menuOffset++; renderMenus(); };
 $("#mnToday").onclick = () => { menuOffset = 0; renderMenus(); };
@@ -726,13 +758,19 @@ document.addEventListener("click", e => {
   const doc = S.menus.find(m => m.id === ds) || {};
   const cur = doc[k] || "";
   const dl = new Date(ds + "T12:00").toLocaleDateString("fr-FR", {weekday:"long", day:"numeric", month:"long"});
+  const dishes = pastDishes();
   const ov = modal(`<h2>${k === "midi" ? "Midi" : "Soir"} · ${esc(dl)}</h2>
+    ${dishes.length ? `<select id="mealPick" aria-label="Repas déjà faits"><option value="">Choisir un repas déjà fait…</option>${dishes.map((d, i) => `<option value="${i}">${esc(d.text.replace(/\n/g, " · "))}</option>`).join("")}</select>` : ""}
     <textarea id="mealIn" rows="3" maxlength="200" placeholder="Ex. Lasagnes, salade verte, yaourt" style="background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:inherit;font-size:17px;resize:vertical">${esc(cur)}</textarea>
     <div class="row"><button class="btn" type="button" id="mealOk">Enregistrer</button>
       ${cur ? `<button class="btn danger" type="button" id="mealDel">Effacer</button>` : ""}
       <button class="btn ghost" type="button" data-close>Annuler</button></div>`);
-  const ta = ov.querySelector("#mealIn"); ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
+  const ta = ov.querySelector("#mealIn");
+  const pick = ov.querySelector("#mealPick");
+  if(pick) pick.addEventListener("change", () => { if(pick.value !== ""){ ta.value = dishes[+pick.value].text; ta.focus(); } });
+  ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
   const save = async v => {
+    if(v){ const h = hiddenDishes().filter(x => x !== dishKey(v)); try { localStorage.setItem("maisonnee.dishes.hidden", JSON.stringify(h)); } catch(e){} }
     const next = {midi: doc.midi || "", soir: doc.soir || "", [k]: v};
     const ok = (!next.midi && !next.soir) ? await del("menus", ds) : await put("menus", ds, next);
     if(ok){ closeModal(); toast(v ? "Repas enregistré" : "Repas effacé"); }
