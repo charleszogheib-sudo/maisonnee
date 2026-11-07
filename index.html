@@ -385,7 +385,7 @@ code{font-size:15px;background:var(--surface-2);padding:1px 5px;border-radius:5p
 <script>
 (function(){
 
-const COLORS = ["#3A7BD5","#D9544D","#2E9E6A","#9B59B6","#E08A1E","#1FA2A8","#C2477F","#6B7A8F"];
+const COLORS = ["#3A7BD5","#D9544D","#2E9E6A","#9B59B6","#9C8AD8","#E08A1E","#1FA2A8","#C2477F","#6B7A8F"];   // #9C8AD8 = violet lavande
 const COLLS = ["members","chores","completions","rewards","shopping","todos","events","lists"];
 const S = {members:[],chores:[],completions:[],rewards:[],shopping:[],todos:[],events:[],lists:[]};
 let db = null, mcp = null, view = "taches", weekOffset = 0, pickedColor = COLORS[0];
@@ -861,6 +861,35 @@ $("#gsSave").addEventListener("click", async () => {
 });
 
 /* ---------- réglages ---------- */
+function editMember(id){
+  const m = member(id); if(!m) return;
+  let color = m.color;
+  const ov = modal(`<h2>Modifier ${esc(m.name)}</h2>
+    <label class="label" for="emName">Prénom</label><input type="text" id="emName" maxlength="24" value="${esc(m.name)}">
+    <div class="label">Couleur</div><div class="swatches" id="emSw"></div>
+    <label class="label" for="emCal">Agenda Google</label><input type="text" id="emCal" value="${esc(m.calendarId || "")}" placeholder="ex. prenom@gmail.com" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <div class="row"><button class="btn ghost" type="button" id="emUp">Monter</button><button class="btn ghost" type="button" id="emDown">Descendre</button><span class="small muted">Ordre d'affichage</span></div>
+    <div class="row"><button class="btn" type="button" id="emOk">Enregistrer</button><button class="btn ghost" type="button" data-close>Annuler</button></div>`);
+  const sw = ov.querySelector("#emSw");
+  const drawSw = () => { sw.innerHTML = COLORS.map(c => `<button type="button" style="--mc:${c}" aria-label="Couleur" aria-pressed="${c === color}" data-c="${c}"></button>`).join(""); };
+  drawSw();
+  sw.addEventListener("click", e => { const b = e.target.closest("[data-c]"); if(b){ color = b.dataset.c; drawSw(); } });
+  const move = async dir => {
+    const ms = sortedMembers(); const i = ms.findIndex(x => x.id === id), j = i + dir;
+    if(j < 0 || j >= ms.length) return;
+    [ms[i], ms[j]] = [ms[j], ms[i]];
+    for(let k = 0; k < ms.length; k++) if((ms[k].order ?? -1) !== k) await patch("members", ms[k].id, {order: k});
+    toast("Ordre modifié");
+  };
+  ov.querySelector("#emUp").onclick = () => move(-1);
+  ov.querySelector("#emDown").onclick = () => move(1);
+  ov.querySelector("#emOk").onclick = async () => {
+    const name = ov.querySelector("#emName").value.trim(); if(!name){ toast("Le prénom ne peut pas être vide"); return; }
+    const cal = ov.querySelector("#emCal").value.trim();
+    if(await patch("members", id, {name, color, calendarId: cal || null})){ closeModal(); toast("Modifications enregistrées"); if(cal !== (m.calendarId || "")) setTimeout(gsFetch, 300); }
+  };
+}
+
 function renderSwatches(){
   $("#swatches").innerHTML = COLORS.map(c => `<button type="button" style="--mc:${c}" aria-label="Couleur" aria-pressed="${c===pickedColor}" data-color="${c}"></button>`).join("");
 }
@@ -870,6 +899,7 @@ function renderReglages(){
   $("#memberList").innerHTML = ms.length ? ms.map(m => {
     return `<div class="item" style="--mc:${esc(m.color)}">${avatar(m)}<div class="t"><b>${esc(m.name)}</b> <span class="small muted">· ${points(m.id)} pts</span></div>
       <input type="text" data-cal="${esc(m.id)}" id="cal-${esc(m.id)}" value="${esc(m.calendarId||"")}" placeholder="Agenda Google (ex. prenom@gmail.com)" aria-label="Agenda Google de ${esc(m.name)}" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:1 1 240px">
+      <button class="btn ghost" type="button" data-editmember="${esc(m.id)}">Modifier</button>
       <button class="icon-btn" type="button" data-delmember="${esc(m.id)}" aria-label="Retirer ${esc(m.name)}">×</button></div>`;
   }).join("") : `<div class="empty">Personne pour l'instant. Ajoutez chaque membre de la famille ci-dessous.</div>`;
   const rw = [...S.rewards].sort((a,b)=>a.cost-b.cost);
@@ -891,6 +921,7 @@ document.addEventListener("change", e => {
   patch("members", s.dataset.cal, {calendarId: v || null}).then(ok => { if(ok){ toast(v ? "Agenda relié" : "Agenda retiré"); setTimeout(gsFetch, 300); } });
 });
 document.addEventListener("click", e => {
+  const ed = e.target.closest("[data-editmember]"); if(ed){ editMember(ed.dataset.editmember); return; }
   const d = e.target.closest("[data-delmember]"); if(d){ const m = member(d.dataset.delmember); if(m) confirmBox(`Retirer ${m.name} de la famille ?`, "Retirer", () => del("members", m.id)); return; }
   const r = e.target.closest("[data-delreward]"); if(r) del("rewards", r.dataset.delreward);
 });
