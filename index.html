@@ -146,6 +146,18 @@ code{font-size:15px;background:var(--surface-2);padding:1px 5px;border-radius:5p
 .bar{height:8px;border-radius:99px;background:var(--surface-2);overflow:hidden;margin:6px 0 4px}
 .bar i{display:block;height:100%;background:var(--good)}
 @media (max-width:860px){.lists{grid-template-columns:1fr}.lnav{flex-direction:row;flex-wrap:wrap}.lnav button.lbtn{width:auto}}
+.menuweek{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
+.mday{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.mday.today{border:2px solid var(--accent)}
+.mday h3{font-size:16px;display:flex;justify-content:space-between}
+.mday h3 span{color:var(--muted);font-weight:500}
+.meal{border:1px dashed var(--line);background:var(--surface-2);border-radius:10px;padding:8px;text-align:left;min-height:84px;display:flex;flex-direction:column;gap:3px;width:100%}
+.meal.filled{border-style:solid;background:var(--gold-soft);border-color:var(--gold)}
+.meal .label{font-size:11px}
+.meal .dish{font-size:15px;line-height:1.3;overflow-wrap:anywhere;white-space:pre-line}
+.meal .plus{color:var(--muted);font-size:14px}
+@media (max-width:1000px){.menuweek{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:700px){.menuweek{grid-template-columns:1fr}.meal{min-height:0}}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(24px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:999px;z-index:60;font-weight:700;max-width:calc(100% - 32px)}
 .swatches{display:flex;gap:8px;flex-wrap:wrap}
 .swatches button{width:36px;height:36px;border-radius:50%;border:3px solid transparent;background:var(--mc)}
@@ -172,6 +184,7 @@ code{font-size:15px;background:var(--surface-2);padding:1px 5px;border-radius:5p
     <button class="tab" data-view="taches" aria-current="page"><svg viewBox="0 0 24 24"><path d="M4 12l5 5L20 6"/></svg>Tâches</button>
     <button class="tab" data-view="courses"><svg viewBox="0 0 24 24"><path d="M3 4h2l2.4 11h11L21 7H6.2"/><circle cx="9" cy="19.5" r="1.3"/><circle cx="17" cy="19.5" r="1.3"/></svg>Courses</button>
     <button class="tab" data-view="todo"><svg viewBox="0 0 24 24"><rect x="4" y="3.5" width="16" height="17" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>À faire</button>
+    <button class="tab" data-view="menus"><svg viewBox="0 0 24 24"><path d="M7 3v8M5 3v5a2 2 0 0 0 4 0V3M7 11v10"/><path d="M17 21V3c-2 1.5-3 4-3 7h3"/></svg>Menus</button>
     <button class="tab" data-view="listes"><svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 5.5l1 1 2-2M4 11.5l1 1 2-2M4 17.5l1 1 2-2"/></svg>Listes</button>
     <button class="tab" data-view="agenda"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Agenda</button>
     <button class="tab" data-view="reglages"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg>Réglages</button>
@@ -271,6 +284,20 @@ code{font-size:15px;background:var(--surface-2);padding:1px 5px;border-radius:5p
         <div class="row" style="margin-bottom:8px"><h2 class="grow">Fait</h2><button class="btn ghost" id="todoClear" type="button">Effacer</button></div>
         <div id="todoDone"></div>
       </div>
+    </section>
+
+    <!-- MENUS -->
+    <section class="view" id="v-menus">
+      <div class="card">
+        <div class="row">
+          <button class="btn ghost" id="mnPrev" type="button" aria-label="Semaine précédente">‹</button>
+          <h2 id="mnLabel" class="grow" style="text-align:center"></h2>
+          <button class="btn ghost" id="mnToday" type="button">Cette semaine</button>
+          <button class="btn ghost" id="mnNext" type="button" aria-label="Semaine suivante">›</button>
+        </div>
+        <p class="small muted" style="margin:8px 0 0;text-align:center">Touchez un repas pour l'inscrire ou le modifier.</p>
+      </div>
+      <div class="menuweek" id="menuWeek"></div>
     </section>
 
     <!-- LISTES -->
@@ -386,8 +413,8 @@ code{font-size:15px;background:var(--surface-2);padding:1px 5px;border-radius:5p
 (function(){
 
 const COLORS = ["#3A7BD5","#D9544D","#2E9E6A","#9B59B6","#9C8AD8","#E08A1E","#1FA2A8","#C2477F","#6B7A8F"];   // #9C8AD8 = violet lavande
-const COLLS = ["members","chores","completions","rewards","shopping","todos","events","lists"];
-const S = {members:[],chores:[],completions:[],rewards:[],shopping:[],todos:[],events:[],lists:[]};
+const COLLS = ["members","chores","completions","rewards","shopping","todos","events","lists","menus"];
+const S = {members:[],chores:[],completions:[],rewards:[],shopping:[],todos:[],events:[],lists:[],menus:[]};
 let db = null, mcp = null, view = "taches", weekOffset = 0, pickedColor = COLORS[0];
 
 
@@ -440,7 +467,7 @@ function tick(){
 tick(); setInterval(tick, 20000);
 
 /* ---------- navigation ---------- */
-const TITLES = {taches:"Tâches & points", courses:"Liste de courses", todo:"À faire en famille", listes:"Listes", agenda:"Agenda familial", reglages:"Réglages"};
+const TITLES = {taches:"Tâches & points", courses:"Liste de courses", todo:"À faire en famille", menus:"Menus de la semaine", listes:"Listes", agenda:"Agenda familial", reglages:"Réglages"};
 function go(v){
   view = v;
   document.querySelectorAll(".tab[data-view]").forEach(b => b.dataset.view === v ? b.setAttribute("aria-current","page") : b.removeAttribute("aria-current"));
@@ -668,6 +695,50 @@ $("#todoClear").addEventListener("click", async () => { for(const t of S.todos.f
 document.addEventListener("click", e => {
   const s = e.target.closest("[data-todo]"); if(s){ const t = S.todos.find(x=>x.id===s.dataset.todo); if(t) patch("todos", t.id, {done:!t.done, doneAt:t.done?null:Date.now()}); return; }
   const d = e.target.closest("[data-deltodo]"); if(d){ del("todos", d.dataset.deltodo); }
+});
+
+/* ---------- menus de la semaine ---------- */
+let menuOffset = 0;
+const MEALS = [["midi","Midi"],["soir","Soir"]];
+function renderMenus(){
+  const ws = monday(new Date()); ws.setDate(ws.getDate() + 7*menuOffset);
+  const we = new Date(ws); we.setDate(we.getDate() + 6);
+  const f = d => d.toLocaleDateString("fr-FR", {day:"numeric", month:"long"});
+  $("#mnLabel").textContent = (menuOffset === 0 ? "Cette semaine · " : menuOffset === 1 ? "Semaine prochaine · " : "") + f(ws) + " – " + f(we);
+  const td = today(); let html = "";
+  for(let i = 0; i < 7; i++){
+    const d = new Date(ws); d.setDate(d.getDate() + i); const ds = dstr(d);
+    const doc = S.menus.find(m => m.id === ds) || {};
+    const wd = d.toLocaleDateString("fr-FR", {weekday:"long"});
+    html += `<div class="mday${ds === td ? " today" : ""}"><h3>${esc(wd.charAt(0).toUpperCase() + wd.slice(1))} <span>${d.getDate()}</span></h3>
+      ${MEALS.map(([k, lbl]) => { const v = (doc[k] || "").trim();
+        return `<button type="button" class="meal${v ? " filled" : ""}" data-meal="${ds}|${k}"><span class="label">${lbl}</span>${v ? `<span class="dish">${esc(v)}</span>` : `<span class="plus">+ Ajouter</span>`}</button>`; }).join("")}
+    </div>`;
+  }
+  $("#menuWeek").innerHTML = html;
+}
+$("#mnPrev").onclick = () => { menuOffset--; renderMenus(); };
+$("#mnNext").onclick = () => { menuOffset++; renderMenus(); };
+$("#mnToday").onclick = () => { menuOffset = 0; renderMenus(); };
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-meal]"); if(!b) return;
+  const [ds, k] = b.dataset.meal.split("|");
+  const doc = S.menus.find(m => m.id === ds) || {};
+  const cur = doc[k] || "";
+  const dl = new Date(ds + "T12:00").toLocaleDateString("fr-FR", {weekday:"long", day:"numeric", month:"long"});
+  const ov = modal(`<h2>${k === "midi" ? "Midi" : "Soir"} · ${esc(dl)}</h2>
+    <textarea id="mealIn" rows="3" maxlength="200" placeholder="Ex. Lasagnes, salade verte, yaourt" style="background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:inherit;font-size:17px;resize:vertical">${esc(cur)}</textarea>
+    <div class="row"><button class="btn" type="button" id="mealOk">Enregistrer</button>
+      ${cur ? `<button class="btn danger" type="button" id="mealDel">Effacer</button>` : ""}
+      <button class="btn ghost" type="button" data-close>Annuler</button></div>`);
+  const ta = ov.querySelector("#mealIn"); ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
+  const save = async v => {
+    const next = {midi: doc.midi || "", soir: doc.soir || "", [k]: v};
+    const ok = (!next.midi && !next.soir) ? await del("menus", ds) : await put("menus", ds, next);
+    if(ok){ closeModal(); toast(v ? "Repas enregistré" : "Repas effacé"); }
+  };
+  ov.querySelector("#mealOk").onclick = () => save(ta.value.trim());
+  if(cur) ov.querySelector("#mealDel").onclick = () => save("");
 });
 
 /* ---------- listes (vacances, valises…) ---------- */
@@ -942,7 +1013,7 @@ function renderAll(){
   fillSelect($("#choreMember"), "N'importe qui");
   fillSelect($("#todoMember"), "Qui veut");
   fillSelect($("#penMember"), "Pour qui ?");
-  renderTaches(); renderCourses(); renderTodo(); renderListes(); renderAgenda(); renderReglages(); if(typeof renderCtrl === "function") renderCtrl(); if(typeof renderGsSettings === "function") renderGsSettings();
+  renderTaches(); renderCourses(); renderTodo(); renderMenus(); renderListes(); renderAgenda(); renderReglages(); if(typeof renderCtrl === "function") renderCtrl(); if(typeof renderGsSettings === "function") renderGsSettings();
 }
 let raf = 0;
 const scheduleRender = () => { if(!raf) raf = requestAnimationFrame(() => { raf = 0; renderAll(); }); };
