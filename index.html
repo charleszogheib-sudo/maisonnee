@@ -18,6 +18,8 @@
   --display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
   --body:"Atkinson Hyperlegible", "Segoe UI", Roboto, system-ui, sans-serif;
   --r:14px;
+  --frog:#3E9B4F;
+  --frogmask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M7.5 3.5a3.5 3.5 0 0 1 3.3 2.3h2.4a3.5 3.5 0 1 1 5.6 3.8c1.5 1.3 2.7 3 2.7 4.8 0 3.9-4.6 6.6-9.5 6.6S2.5 18.3 2.5 14.4c0-1.8 1.2-3.5 2.7-4.8A3.5 3.5 0 0 1 7.5 3.5z'/%3E%3C/svg%3E");
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#11161E; --surface:#1A212C; --surface-2:#212A36; --ink:#E8EDF4; --muted:#9AA6B6; --line:#2E3949;
@@ -36,7 +38,7 @@ h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance;letter-spacing:-.
 .app{display:grid;grid-template-columns:96px 1fr;height:100%}
 nav.rail{background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:6px;padding-block:14px;padding-left:env(safe-area-inset-left,0px)}
 .brand{font-family:var(--display);font-weight:800;font-size:15px;text-align:center;line-height:1.05;padding:4px 6px 12px;color:var(--accent)}
-.tab{width:80px;border:0;background:none;border-radius:12px;padding:10px 4px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:13px;color:var(--muted)}
+.tab{width:80px;border:0;background:none;border-radius:12px;padding:7px 4px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:13px;color:var(--muted)}
 .tab svg{width:28px;height:28px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 .tab[aria-current="page"]{background:var(--accent);color:var(--accent-ink)}
 .rail .spacer{flex:1}
@@ -162,6 +164,26 @@ code{font-size:15px;background:var(--surface-2);padding:1px 5px;border-radius:5p
 .meal .plus{color:var(--muted);font-size:14px}
 @media (max-width:1000px){.menuweek{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:700px){.menuweek{grid-template-columns:1fr}.meal{min-height:0}}
+.frogkid{display:flex;flex-direction:column;gap:10px}
+.frogrow{display:grid;grid-template-columns:120px minmax(0,1fr);gap:14px;align-items:start;padding:12px 14px}
+.frogwho{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.frogwho h2{font-size:20px}
+.frogwho .fstats{margin:0;text-align:left}
+@media (max-width:700px){.frogrow{grid-template-columns:1fr}.frogwho{flex-direction:row;align-items:center;flex-wrap:wrap}.frogwho .fstats{margin-left:auto;text-align:right}}
+.frogmonths{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:14px}
+.fmonth h4{margin:0 0 4px;font-size:13px;font-weight:700;color:var(--muted);text-transform:capitalize}
+.fgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.fday{aspect-ratio:1;max-width:100%;border:1.5px solid var(--line);background:var(--surface-2);border-radius:5px;padding:0;font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums;display:grid;place-items:center;min-width:0}
+.fday.on{background:var(--frog);border-color:var(--frog);color:#fff}
+.fday.on::after{content:"";width:55%;height:55%;background:#fff;-webkit-mask:var(--frogmask) center/contain no-repeat;mask:var(--frogmask) center/contain no-repeat}
+.fday.on span{display:none}
+.fday.today{outline:2.5px solid var(--accent);outline-offset:1px}
+.fday:disabled{opacity:.35;cursor:default}
+.fday.out{visibility:hidden}
+.fstats{margin-left:auto;text-align:right;font-variant-numeric:tabular-nums}
+.fstats b{font-family:var(--display);font-size:28px;color:var(--frog);display:block;line-height:1}
+@media (max-width:1000px){.frogmonths{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:700px){.frogmonths{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(24px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:999px;z-index:60;font-weight:700;max-width:calc(100% - 32px)}
 .swatches{display:flex;gap:8px;flex-wrap:wrap}
 .swatches button{width:36px;height:36px;border-radius:50%;border:3px solid transparent;background:var(--mc)}
@@ -172,7 +194,8 @@ code{font-size:15px;background:var(--surface-2);padding:1px 5px;border-radius:5p
   .app{grid-template-columns:1fr;grid-template-rows:1fr auto}
   nav.rail{grid-row:2;flex-direction:row;justify-content:space-around;border-right:0;border-top:1px solid var(--line);padding:6px max(8px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px))}
   .brand,.rail .spacer,#wakeBtn{display:none}
-  .tab{width:auto;flex:1;font-size:11px;padding:6px 2px}
+  .tab{width:auto;flex:1;font-size:10px;padding:6px 1px;min-width:0;overflow:hidden}
+  .tab svg{width:24px;height:24px}
   .calframe{height:70vh;min-height:420px}
   .week{grid-template-columns:1fr}
   .day{min-height:0}
@@ -188,6 +211,7 @@ code{font-size:15px;background:var(--surface-2);padding:1px 5px;border-radius:5p
     <button class="tab" data-view="taches" aria-current="page"><svg viewBox="0 0 24 24"><path d="M4 12l5 5L20 6"/></svg>Tâches</button>
     <button class="tab" data-view="courses"><svg viewBox="0 0 24 24"><path d="M3 4h2l2.4 11h11L21 7H6.2"/><circle cx="9" cy="19.5" r="1.3"/><circle cx="17" cy="19.5" r="1.3"/></svg>Courses</button>
     <button class="tab" data-view="todo"><svg viewBox="0 0 24 24"><rect x="4" y="3.5" width="16" height="17" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>À faire</button>
+    <button class="tab" data-view="grenouille"><svg viewBox="0 0 24 24"><circle cx="7.5" cy="7" r="2.6"/><circle cx="16.5" cy="7" r="2.6"/><path d="M5.3 8.8C3.5 10.2 2.5 12.1 2.5 14.2c0 3.5 4.3 5.8 9.5 5.8s9.5-2.3 9.5-5.8c0-2.1-1-4-2.8-5.4"/><path d="M8.5 14.6c1 .9 2.2 1.4 3.5 1.4s2.5-.5 3.5-1.4"/><circle cx="7.5" cy="7" r=".7" fill="currentColor"/><circle cx="16.5" cy="7" r=".7" fill="currentColor"/></svg>Grenouille</button>
     <button class="tab" data-view="menus"><svg viewBox="0 0 24 24"><path d="M7 3v8M5 3v5a2 2 0 0 0 4 0V3M7 11v10"/><path d="M17 21V3c-2 1.5-3 4-3 7h3"/></svg>Menus</button>
     <button class="tab" data-view="listes"><svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 5.5l1 1 2-2M4 11.5l1 1 2-2M4 17.5l1 1 2-2"/></svg>Listes</button>
     <button class="tab" data-view="agenda"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Agenda</button>
@@ -288,6 +312,17 @@ code{font-size:15px;background:var(--surface-2);padding:1px 5px;border-radius:5p
         <div class="row" style="margin-bottom:8px"><h2 class="grow">Fait</h2><button class="btn ghost" id="todoClear" type="button">Effacer</button></div>
         <div id="todoDone"></div>
       </div>
+    </section>
+
+    <!-- GRENOUILLE -->
+    <section class="view" id="v-grenouille">
+      <div class="card">
+        <div class="row">
+          <p class="grow small muted" style="margin:0">Une case par jour pendant 6 mois. Touchez la case du jour pour la cocher (ou la décocher). Les jours à venir ne peuvent pas encore être cochés.</p>
+          <label class="row small" for="frogStart">Début <input type="date" id="frogStart"></label>
+        </div>
+      </div>
+      <div id="frogKids" class="frogkid"></div>
     </section>
 
     <!-- MENUS -->
@@ -422,8 +457,8 @@ code{font-size:15px;background:var(--surface-2);padding:1px 5px;border-radius:5p
 (function(){
 
 const COLORS = ["#3A7BD5","#D9544D","#2E9E6A","#9B59B6","#9C8AD8","#E08A1E","#1FA2A8","#C2477F","#6B7A8F"];   // #9C8AD8 = violet lavande
-const COLLS = ["members","chores","completions","rewards","shopping","todos","events","lists","menus"];
-const S = {members:[],chores:[],completions:[],rewards:[],shopping:[],todos:[],events:[],lists:[],menus:[]};
+const COLLS = ["members","chores","completions","rewards","shopping","todos","events","lists","menus","frog"];
+const S = {members:[],chores:[],completions:[],rewards:[],shopping:[],todos:[],events:[],lists:[],menus:[],frog:[]};
 let db = null, mcp = null, view = "taches", weekOffset = 0, pickedColor = COLORS[0];
 
 
@@ -476,7 +511,7 @@ function tick(){
 tick(); setInterval(tick, 20000);
 
 /* ---------- navigation ---------- */
-const TITLES = {taches:"Tâches & points", courses:"Liste de courses", todo:"À faire en famille", menus:"Menus de la semaine", listes:"Listes", agenda:"Agenda familial", reglages:"Réglages"};
+const TITLES = {taches:"Tâches & points", courses:"Liste de courses", todo:"À faire en famille", grenouille:"La grenouille", menus:"Menus de la semaine", listes:"Listes", agenda:"Agenda familial", reglages:"Réglages"};
 function go(v){
   view = v;
   document.querySelectorAll(".tab[data-view]").forEach(b => b.dataset.view === v ? b.setAttribute("aria-current","page") : b.removeAttribute("aria-current"));
@@ -706,6 +741,53 @@ document.addEventListener("click", e => {
   const d = e.target.closest("[data-deltodo]"); if(d){ del("todos", d.dataset.deltodo); }
 });
 
+/* ---------- la grenouille : une case par jour sur 6 mois ---------- */
+const FROG_KIDS = ["Aydan", "Wyatt", "June"];
+const fnorm = t => (t||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim().toLowerCase();
+const FROG_COLORS = {aydan:"#2E9E6A", wyatt:"#9B59B6", june:"#E08A1E"};
+function frogStart(){
+  const c = S.frog.find(d => d.id === "config");
+  return (c && c.start) || "2026-11-01";
+}
+function frogDays(){
+  const st = new Date(frogStart() + "T12:00"); const end = new Date(st); end.setMonth(end.getMonth() + 6);
+  const out = []; for(const d = new Date(st); d < end; d.setDate(d.getDate() + 1)) out.push(dstr(d));
+  return out;
+}
+function renderFrog(){
+  if(document.activeElement !== $("#frogStart")) $("#frogStart").value = frogStart();
+  const days = frogDays(), td = today();
+  const months = []; for(const ds of days){ const k = ds.slice(0, 7); let m = months[months.length - 1]; if(!m || m.key !== k){ m = {key: k, days: []}; months.push(m); } m.days.push(ds); }
+  const html = FROG_KIDS.map(name => {
+    const key = fnorm(name), m = S.members.find(x => fnorm(x.name) === key);
+    const color = m ? m.color : FROG_COLORS[key];
+    const doc = S.frog.find(d => d.id === key) || {}; const got = doc.days || {};
+    const n = days.filter(d => got[d]).length;
+    let streak = 0; for(let i = days.indexOf(td) >= 0 ? days.indexOf(td) : days.length - 1; i >= 0; i--){ if(got[days[i]]) streak++; else if(days[i] !== td) break; }
+    return `<div class="card frogrow" style="--mc:${esc(color)};border-left:6px solid var(--mc)">
+      <div class="frogwho">${avatar(m || {name, color})}<h2>${esc(name)}</h2>
+        <div class="fstats"><b>${n}</b><span class="small muted">/ ${days.length} jours</span>${streak > 1 ? `<div class="small muted">${streak} jours d'affilée</div>` : ""}</div></div>
+      <div class="frogmonths">${months.map(mo => {
+        const first = new Date(mo.days[0] + "T12:00"); const lead = (first.getDay() + 6) % 7;
+        const label = first.toLocaleDateString("fr-FR", {month: "long", year: first.getMonth() === 0 || mo === months[0] ? "numeric" : undefined});
+        return `<div class="fmonth"><h4>${esc(label)}</h4><div class="fgrid">${'<span class="fday out"></span>'.repeat(lead)}${mo.days.map(ds => {
+          const on = !!got[ds], fut = ds > td;
+          return `<button type="button" class="fday${on ? " on" : ""}${ds === td ? " today" : ""}" data-frog="${key}|${ds}" ${fut ? "disabled" : ""} aria-label="${esc(name)} ${ds}${on ? " cochée" : ""}" aria-pressed="${on}"><span>${+ds.slice(8)}</span></button>`;
+        }).join("")}</div></div>`; }).join("")}</div>
+    </div>`;
+  }).join("");
+  $("#frogKids").innerHTML = html;
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-frog]"); if(!b || b.disabled) return;
+  const [key, ds] = b.dataset.frog.split("|");
+  const doc = S.frog.find(d => d.id === key);
+  const days = {...((doc && doc.days) || {})};
+  if(days[ds]) delete days[ds]; else days[ds] = true;
+  put("frog", key, {days});
+});
+$("#frogStart").addEventListener("change", () => { const v = $("#frogStart").value; if(v) put("frog", "config", {start: v}); });
+
 /* ---------- menus de la semaine ---------- */
 let menuOffset = 0;
 const MEALS = [["midi","Midi"],["soir","Soir"]];
@@ -728,7 +810,7 @@ function renderMenus(){
   renderDishes();
 }
 function hiddenDishes(){ try { return JSON.parse(localStorage.getItem("maisonnee.dishes.hidden") || "[]"); } catch(e){ return []; } }
-const dishKey = t => norm(t).replace(/\s+/g, " ");
+const dishKey = t => fnorm(t).replace(/\s+/g, " ");
 function pastDishes(){
   const hid = new Set(hiddenDishes()), map = new Map();
   for(const m of S.menus) for(const k of ["midi", "soir"]){
@@ -1112,7 +1194,7 @@ function renderAll(){
   fillSelect($("#choreMember"), "N'importe qui");
   fillSelect($("#todoMember"), "Qui veut");
   fillSelect($("#penMember"), "Pour qui ?");
-  renderTaches(); renderCourses(); renderTodo(); renderMenus(); renderListes(); renderAgenda(); renderReglages(); if(typeof renderCtrl === "function") renderCtrl(); if(typeof renderGsSettings === "function") renderGsSettings();
+  renderTaches(); renderCourses(); renderTodo(); renderMenus(); renderFrog(); renderListes(); renderAgenda(); renderReglages(); if(typeof renderCtrl === "function") renderCtrl(); if(typeof renderGsSettings === "function") renderGsSettings();
 }
 let raf = 0;
 const scheduleRender = () => { if(!raf) raf = requestAnimationFrame(() => { raf = 0; renderAll(); }); };
