@@ -151,6 +151,10 @@ code{font-size:15px;background:var(--surface-2);padding:1px 5px;border-radius:5p
 .mday.today{border:2px solid var(--accent)}
 .mday h3{font-size:16px;display:flex;justify-content:space-between}
 .mday h3 span{color:var(--muted);font-weight:500}
+.meal{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;transition:transform .12s}
+.meal.dragging{opacity:.35}
+.meal.drop{outline:3px solid var(--accent);outline-offset:2px;transform:scale(1.03)}
+.meal-ghost{position:fixed;z-index:70;pointer-events:none;box-shadow:0 12px 30px rgba(0,0,0,.25);transform:rotate(-2deg)}
 .meal{border:1px dashed var(--line);background:var(--surface-2);border-radius:10px;padding:8px;text-align:left;min-height:84px;display:flex;flex-direction:column;gap:3px;width:100%}
 .meal.filled{border-style:solid;background:var(--gold-soft);border-color:var(--gold)}
 .meal .label{font-size:11px}
@@ -295,7 +299,7 @@ code{font-size:15px;background:var(--surface-2);padding:1px 5px;border-radius:5p
           <button class="btn ghost" id="mnToday" type="button">Cette semaine</button>
           <button class="btn ghost" id="mnNext" type="button" aria-label="Semaine suivante">›</button>
         </div>
-        <p class="small muted" style="margin:8px 0 0;text-align:center">Touchez un repas pour l'inscrire ou le modifier.</p>
+        <p class="small muted" style="margin:8px 0 0;text-align:center">Touchez un repas pour l'inscrire ou le modifier. Restez appuyé dessus puis faites-le glisser sur une autre case pour les intervertir.</p>
       </div>
       <div class="menuweek" id="menuWeek"></div>
       <details class="card" id="dishCard">
@@ -749,11 +753,68 @@ document.addEventListener("click", e => {
   try { localStorage.setItem("maisonnee.dishes.hidden", JSON.stringify(h)); } catch(err){}
   renderDishes(); toast("Retiré de la liste des repas");
 });
+/* glisser-déposer pour intervertir deux repas */
+let mealDrag = null, mealDragEnded = false;
+async function swapMeals(a, b){
+  const [da, ka] = a.split("|"), [db2, kb] = b.split("|");
+  const get = d => { const x = S.menus.find(m => m.id === d) || {}; return {midi: x.midi || "", soir: x.soir || ""}; };
+  const A = get(da), B = da === db2 ? A : get(db2);
+  const va = A[ka], vb = B[kb]; A[ka] = vb; B[kb] = va;
+  const w = (d, o) => (!o.midi && !o.soir) ? del("menus", d) : put("menus", d, o);
+  if(await w(da, A) && (da === db2 || await w(db2, B))) toast(vb ? "Repas intervertis" : "Repas déplacé");
+}
+function endMealDrag(drop){
+  if(!mealDrag) return;
+  clearTimeout(mealDrag.timer);
+  const d = mealDrag; mealDrag = null;
+  if(d.active){
+    mealDragEnded = true; setTimeout(() => { mealDragEnded = false; }, 400);
+    d.el.classList.remove("dragging"); if(d.ghost) d.ghost.remove();
+    document.querySelectorAll(".meal.drop").forEach(x => x.classList.remove("drop"));
+    if(drop && d.target && d.target !== d.el) swapMeals(d.el.dataset.meal, d.target.dataset.meal);
+  }
+}
+function startMealDrag(){
+  const d = mealDrag; if(!d || d.active) return;
+  d.active = true;
+  try { navigator.vibrate && navigator.vibrate(25); } catch(e){}
+  d.el.classList.add("dragging");
+  const g = d.el.cloneNode(true); g.classList.remove("dragging"); g.classList.add("meal-ghost"); g.removeAttribute("data-meal"); g.style.width = d.el.offsetWidth + "px"; d.w = d.el.offsetWidth;
+  document.body.appendChild(g); d.ghost = g; moveMealGhost(d.x, d.y);
+}
+function moveMealGhost(x, y){
+  const d = mealDrag; if(!d || !d.ghost) return;
+  d.ghost.style.left = (x - (d.w || 150)/2) + "px"; d.ghost.style.top = (y - 30) + "px";
+  const t = document.elementFromPoint(x, y); const m = t && t.closest(".meal[data-meal]");
+  if(m !== d.target){ if(d.target) d.target.classList.remove("drop"); d.target = m && m !== d.el ? m : null; if(d.target) d.target.classList.add("drop"); }
+}
+$("#menuWeek").addEventListener("pointerdown", e => {
+  const m = e.target.closest(".meal[data-meal]"); if(!m || !m.classList.contains("filled") || e.button > 0) return;
+  mealDrag = {el: m, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, active: false, mouse: e.pointerType === "mouse"};
+  mealDrag.timer = setTimeout(startMealDrag, 300);
+});
+document.addEventListener("pointermove", e => {
+  const d = mealDrag; if(!d) return;
+  d.x = e.clientX; d.y = e.clientY;
+  const moved = Math.hypot(d.x - d.sx, d.y - d.sy);
+  if(!d.active){
+    if(d.mouse && moved > 8) startMealDrag();
+    else if(!d.mouse && moved > 10) endMealDrag(false);   // le doigt fait défiler la page
+    return;
+  }
+  moveMealGhost(d.x, d.y);
+});
+document.addEventListener("pointerup", () => endMealDrag(true));
+document.addEventListener("pointercancel", () => endMealDrag(false));
+document.addEventListener("touchmove", e => { if(mealDrag && mealDrag.active) e.preventDefault(); }, {passive: false});
+$("#menuWeek").addEventListener("contextmenu", e => { if(e.target.closest(".meal")) e.preventDefault(); });
+
 $("#mnPrev").onclick = () => { menuOffset--; renderMenus(); };
 $("#mnNext").onclick = () => { menuOffset++; renderMenus(); };
 $("#mnToday").onclick = () => { menuOffset = 0; renderMenus(); };
 document.addEventListener("click", e => {
   const b = e.target.closest("[data-meal]"); if(!b) return;
+  if(mealDragEnded){ mealDragEnded = false; return; }
   const [ds, k] = b.dataset.meal.split("|");
   const doc = S.menus.find(m => m.id === ds) || {};
   const cur = doc[k] || "";
