@@ -91,6 +91,18 @@ form.add input[type=text]{flex:1 1 220px}
 .hist{display:flex;gap:10px;align-items:center;padding:7px 0;border-top:1px solid var(--line);font-size:15px}
 .hist .p{margin-left:auto;font-weight:700;font-variant-numeric:tabular-nums}
 .plus{color:var(--good)} .minus{color:var(--danger)}
+/* Sous-onglets des tâches : Tous + un par personne */
+.subtabs{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 14px;scrollbar-width:none}
+.subtabs::-webkit-scrollbar{display:none}
+.stab{display:flex;align-items:center;gap:8px;flex:none;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:6px 16px 6px 6px;min-height:48px;font-weight:700;font-size:16px}
+.stab.all{padding-left:16px}
+.stab[aria-selected="true"]{background:var(--mc,var(--accent));border-color:var(--mc,var(--accent));color:#fff}
+.stab.all[aria-selected="true"]{color:var(--accent-ink)}
+.stab[aria-selected="true"] .av{background:rgba(255,255,255,.25)}
+.stab .n{font-weight:400;font-size:13px;opacity:.85;font-variant-numeric:tabular-nums}
+.board.solo{grid-template-columns:minmax(0,1fr)}
+.board.solo .chore{padding:14px 4px}
+.board.solo .ctitle{font-size:19px}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
 
 /* Listes */
@@ -229,6 +241,7 @@ code{font-size:15px;background:var(--surface-2);padding:1px 5px;border-radius:5p
 
     <!-- TÂCHES -->
     <section class="view on" id="v-taches">
+      <div class="subtabs" id="choreTabs" role="tablist" aria-label="Tâches de qui ?"></div>
       <div class="board" id="board"></div>
       <div class="card" id="anyCard" hidden>
         <div class="row" style="margin-bottom:6px"><h2 class="grow">Pour qui veut</h2><span class="muted small">Le premier qui la fait gagne les points</span></div>
@@ -595,11 +608,27 @@ function choreRow(ch){
     <button class="icon-btn" type="button" data-delchore="${esc(ch.id)}" aria-label="Supprimer la tâche">×</button>
   </div>`;
 }
+/* sous-onglet choisi dans Tâches : "" = Tous, sinon l'id du membre (préférence d'affichage, pas une donnée) */
+let choreTab = ""; try { choreTab = localStorage.getItem("maisonnee.choreTab") || ""; } catch(e){}
+function setChoreTab(id){
+  choreTab = id || ""; try { localStorage.setItem("maisonnee.choreTab", choreTab); } catch(e){}
+  if(choreTab){ $("#choreMember").value = choreTab; $("#penMember").value = choreTab; }
+  renderTaches();
+}
 function renderTaches(){
-  const ms = sortedMembers();
+  const all = sortedMembers();
+  const tab = choreTab && member(choreTab) ? choreTab : "";
+  const ms = tab ? all.filter(m => m.id === tab) : all;
   const visible = ch => !(ch.rec === "once" && ch.lastDone && ch.lastDone < today());
+  const leftOf = mid => S.chores.filter(c => c.memberId === mid && visible(c) && !isDone(c)).length;
+  const tabs = $("#choreTabs");
+  tabs.hidden = !all.length;
+  tabs.innerHTML = `<button type="button" role="tab" class="stab all" data-ctab="" aria-selected="${!tab}">Tous</button>` +
+    all.map(m => { const n = leftOf(m.id);
+      return `<button type="button" role="tab" class="stab" data-ctab="${esc(m.id)}" style="--mc:${esc(m.color)}" aria-selected="${tab===m.id}">${avatar(m,true)}${esc(m.name)}${n?`<span class="n">${n}</span>`:""}</button>`; }).join("");
   const board = $("#board");
-  if(!ms.length){
+  board.classList.toggle("solo", !!tab);
+  if(!all.length){
     board.innerHTML = `<div class="card"><h2>Bienvenue !</h2><p class="muted">Commencez par ajouter les membres de la famille dans <b>Réglages</b>, puis créez les tâches ici.</p><button class="btn" type="button" id="goSet">Ajouter la famille</button></div>`;
     $("#goSet").onclick = () => go("reglages");
   } else {
@@ -621,12 +650,13 @@ function renderTaches(){
   $("#rewardList").innerHTML = rw.length ? rw.map(r => `<div class="reward"><span class="chip gold">${esc(r.cost)} pts</span><div class="grow">${esc(r.title)}</div><button class="btn gold" type="button" data-redeem="${esc(r.id)}">Échanger</button></div>`).join("")
     : `<div class="empty">Aucune récompense pour l'instant. Ajoutez-en dans Réglages.</div>`;
 
-  const hist = [...S.completions].sort((a,b)=>b.at-a.at).slice(0,10);
+  const hist = S.completions.filter(h => !tab || h.memberId === tab).sort((a,b)=>b.at-a.at).slice(0,10);
   $("#histList").innerHTML = hist.length ? hist.map(h => { const m = member(h.memberId);
     return `<div class="hist">${avatar(m,true)}<div class="grow">${esc(m?m.name:"?")} · ${esc(h.title)}<div class="small muted">${new Date(h.at).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"})}</div></div><span class="p ${h.points<0?"minus":"plus"}">${h.points>0?"+":""}${esc(h.points)}</span></div>`; }).join("")
     : `<div class="empty">Les points gagnés apparaîtront ici.</div>`;
 }
 document.addEventListener("click", e => {
+  const t = e.target.closest("[data-ctab]"); if(t){ setChoreTab(t.dataset.ctab); return; }
   const c = e.target.closest("[data-chore]"); if(c){ const ch = S.chores.find(x=>x.id===c.dataset.chore); if(ch) onChoreTap(ch); return; }
   const d = e.target.closest("[data-delchore]"); if(d){ const ch = S.chores.find(x=>x.id===d.dataset.delchore); if(ch) confirmBox(`Supprimer « ${ch.title} » ?`, "Supprimer", () => del("chores", ch.id)); return; }
   const r = e.target.closest("[data-redeem]"); if(r){
