@@ -108,11 +108,14 @@ form.add input[type=text]{flex:1 1 220px}
 /* Routines */
 .rper{margin-top:12px;border-radius:12px;padding:6px 10px 4px;background:var(--surface-2)}
 .rper h3{font-size:15px;font-weight:700;display:flex;justify-content:space-between;align-items:center;gap:8px;margin:2px 0 2px}
-.rper h3 span{font-weight:500;color:var(--muted);font-size:13px}
+.rper h3 span{white-space:nowrap;font-weight:500;color:var(--muted);font-size:13px}
 .rper.now{background:var(--surface);outline:2px solid var(--mc)}
 .rper.now h3::after{content:"maintenant";font-size:12px;font-weight:700;color:#fff;background:var(--mc);border-radius:999px;padding:1px 8px;margin-left:auto}
 .rper .chore:first-of-type{border-top:0}
 .rper .empty{padding:4px 2px 8px;font-size:14px}
+.chip.pen{background:transparent;color:var(--danger);border-color:var(--danger)}
+.chore.missed .ctitle{color:var(--muted)}
+.chore .check:disabled{opacity:.55}
 .rform{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;align-items:end;margin-top:10px}
 .rform label{display:flex;flex-direction:column;gap:4px;font-size:14px;color:var(--muted)}
 .rform label input,.rform label select{color:var(--ink)}
@@ -384,7 +387,7 @@ code{font-size:15px;background:var(--surface-2);padding:1px 5px;border-radius:5p
             <div><div class="small muted" style="margin-bottom:4px">Quand ?</div><div class="seg days" id="routDays" role="group" aria-label="Jours"></div></div>
             <div><div class="small muted" style="margin-bottom:4px">Période</div><div class="seg" id="routPeriod" role="group" aria-label="Période"></div></div>
           </div>
-          <div class="row full" style="gap:12px"><button class="btn" type="submit">Ajouter</button><span class="chip gold">+1 point par routine faite</span></div>
+          <div class="row full" style="gap:12px"><button class="btn" type="submit">Ajouter</button><span class="chip gold">+1 point par routine faite</span><span class="chip pen">−2 points si elle n'est pas cochée à la fin de la période</span></div>
         </form>
         <details style="margin-top:14px"><summary class="muted">Toutes les routines (<span id="routCount">0</span>)</summary><div id="routAll" style="margin-top:8px"></div></details>
       </div>
@@ -1053,11 +1056,43 @@ const nowPeriod = () => { const h = new Date().getHours(); const p = RPER.find(p
 const routDone = r => r.lastDone === today();
 const daysLabel = ds => ds.length === 7 ? "tous les jours" : RDAYS.filter(([d]) => ds.includes(d)).map(([, l]) => l).join(" ");
 let routDaysSel = [1,2,3,4,5,6,0], routPerSel = "matin";
+const ROUT_PENALTY = 2;
+// fin de la période d'une routine pour un jour donné (Date)
+const periodEnd = (r, d) => { const p = RPER.find(p => p.k === r.period) || RPER[2]; const e = new Date(d); e.setHours(p.to, 0, 0, 0); return e; };
+const routOver = r => Date.now() >= periodEnd(r, new Date()).getTime();
 function routRow(r){
-  const done = routDone(r);
-  return `<div class="chore${done ? " done" : ""}">
-    <button class="check" type="button" data-kroute="${esc(r.id)}" aria-label="${done ? "Annuler" : "Marquer comme fait"} : ${esc(r.title)}"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg></button>
-    <div class="grow"><div class="ctitle">${esc(r.title)}</div></div><span class="chip gold">+1</span></div>`;
+  const done = routDone(r), missed = !done && routOver(r), locked = routOver(r);
+  return `<div class="chore${done ? " done" : ""}${missed ? " missed" : ""}">
+    <button class="check" type="button" data-kroute="${esc(r.id)}" ${locked ? "disabled" : ""} aria-label="${done ? "Annuler" : "Marquer comme fait"} : ${esc(r.title)}"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg></button>
+    <div class="grow"><div class="ctitle">${esc(r.title)}</div>${missed ? `<div class="small minus">Oubliée</div>` : ""}</div>${missed ? `<span class="chip pen">−${ROUT_PENALTY}</span>` : `<span class="chip gold">+1</span>`}</div>`;
+}
+/* Pénalité automatique : à la fin de chaque période, −2 points par routine non cochée.
+   Chaque routine retient le dernier jour vérifié (checkedTo), donc une période passée pendant
+   que l'appli était fermée est rattrapée au prochain lancement, et jamais comptée deux fois
+   (l'identifiant de la pénalité est fixe : pen-<routine>-<jour>). Rattrapage limité à 7 jours. */
+let penRunning = false;
+async function applyRoutinePenalties(){
+  if(penRunning || !S.kidRoutines.length) return; penRunning = true;
+  try {
+    const now = Date.now(), floor = new Date(); floor.setHours(0,0,0,0); floor.setDate(floor.getDate() - 7);
+    for(const r of [...S.kidRoutines]){
+      if(!member(r.memberId)) continue;
+      const created = new Date(r.at || now);
+      let d = r.checkedTo ? new Date(r.checkedTo + "T00:00:00") : new Date(created.getFullYear(), created.getMonth(), created.getDate() - 1);
+      d.setDate(d.getDate() + 1); if(d < floor) d = new Date(floor);
+      let last = null;
+      for(; periodEnd(r, d).getTime() <= now; d.setDate(d.getDate() + 1)){
+        const day = dstr(d), end = periodEnd(r, d).getTime();
+        last = day;
+        if(!(r.days || []).includes(d.getDay()) || end <= (r.at || 0)) continue;   // pas prévue ce jour-là, ou créée après la fin de la période
+        const done = r.lastDone === day || S.completions.some(c => c.type === "routine" && c.routineId === r.id && c.day === day);
+        const pid = "pen-" + r.id + "-" + day;
+        if(!done && !S.completions.some(c => c.id === pid))
+          await put("completions", pid, {type:"penalty", routineId:r.id, title:"Routine oubliée : " + r.title, memberId:r.memberId, points:-ROUT_PENALTY, at:end, day});
+      }
+      if(last && last !== r.checkedTo) await patch("kidRoutines", r.id, {checkedTo: last});
+    }
+  } finally { penRunning = false; }
 }
 function renderRoutine(){
   const ks = kids(), dow = new Date().getDay(), np = nowPeriod(), board = $("#routBoard");
@@ -1066,7 +1101,7 @@ function renderRoutine(){
   } else {
     board.innerHTML = ks.map(m => {
       const mine = S.kidRoutines.filter(r => r.memberId === m.id && (r.days || []).includes(dow));
-      const left = mine.filter(r => !routDone(r)).length;
+      const left = mine.filter(r => !routDone(r) && !routOver(r)).length;
       return `<div class="card mcard" style="--mc:${esc(m.color)}">
         <div class="mhead">${avatar(m)}<div><h2>${esc(m.name)}</h2><div class="small muted">${mine.length ? (left ? `${left} routine${left > 1 ? "s" : ""} à faire` : "Tout est fait !") : "Rien aujourd'hui"}</div></div>
           <div class="pts"><b>${points(m.id)}</b><span>points</span></div></div>
@@ -1098,7 +1133,7 @@ async function toggleRoutine(r){
   }
 }
 document.addEventListener("click", e => {
-  const c = e.target.closest("[data-kroute]"); if(c){ const r = S.kidRoutines.find(x => x.id === c.dataset.kroute); if(r) toggleRoutine(r); return; }
+  const c = e.target.closest("[data-kroute]"); if(c){ const r = S.kidRoutines.find(x => x.id === c.dataset.kroute); if(r && !routOver(r)) toggleRoutine(r); return; }
   const d = e.target.closest("[data-delkroute]"); if(d){ const r = S.kidRoutines.find(x => x.id === d.dataset.delkroute); if(r) confirmBox(`Supprimer la routine « ${r.title} » ?`, "Supprimer", () => del("kidRoutines", r.id)); return; }
   const dy = e.target.closest("[data-rday]"); if(dy){ const n = +dy.dataset.rday; routDaysSel = routDaysSel.includes(n) ? routDaysSel.filter(x => x !== n) : [...routDaysSel, n]; renderRoutine(); return; }
   const pr = e.target.closest("[data-rper]"); if(pr){ routPerSel = pr.dataset.rper; renderRoutine(); }
@@ -1112,7 +1147,8 @@ $("#routForm").addEventListener("submit", async e => {
   for(const mid of ids) await put("kidRoutines", uid(), {title, memberId: mid, days: [...routDaysSel], period: routPerSel, points: 1, at: Date.now()});
   $("#routTitle").value = ""; toast(ids.length > 1 ? `Routine ajoutée pour ${ids.length} enfants` : "Routine ajoutée");
 });
-setInterval(() => { if(view === "routine") renderRoutine(); }, 60000);
+setInterval(() => { applyRoutinePenalties(); if(view === "routine") renderRoutine(); }, 60000);
+setTimeout(applyRoutinePenalties, 3000);
 
 /* ---------- agenda (Google Agenda intégré) ---------- */
 let calMode = "WEEK", lastCalUrl = "";
