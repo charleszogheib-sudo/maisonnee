@@ -105,6 +105,24 @@ form.add input[type=text]{flex:1 1 220px}
 .board.solo .ctitle{font-size:19px}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
 
+/* Routines */
+.rper{margin-top:12px;border-radius:12px;padding:6px 10px 4px;background:var(--surface-2)}
+.rper h3{font-size:15px;font-weight:700;display:flex;justify-content:space-between;align-items:center;gap:8px;margin:2px 0 2px}
+.rper h3 span{white-space:nowrap;font-weight:500;color:var(--muted);font-size:13px}
+.rper.now{background:var(--surface);outline:2px solid var(--mc)}
+.rper.now h3::after{content:"maintenant";font-size:12px;font-weight:700;color:#fff;background:var(--mc);border-radius:999px;padding:1px 8px;margin-left:auto}
+.rper .chore:first-of-type{border-top:0}
+.rper .empty{padding:4px 2px 8px;font-size:14px}
+.chip.pen{background:transparent;color:var(--danger);border-color:var(--danger)}
+.chore.missed .ctitle{color:var(--muted)}
+.chore .check:disabled{opacity:.55}
+.rform{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;align-items:end;margin-top:10px}
+.rform label{display:flex;flex-direction:column;gap:4px;font-size:14px;color:var(--muted)}
+.rform label input,.rform label select{color:var(--ink)}
+.seg.days button{padding:10px 11px}
+.rform .full{grid-column:1/-1}
+.seg button{white-space:nowrap}
+
 /* Listes */
 .item{display:flex;align-items:center;gap:12px;padding:8px 2px;border-top:1px solid var(--line)}
 .item:first-child{border-top:0}
@@ -359,15 +377,19 @@ code{font-size:15px;background:var(--surface-2);padding:1px 5px;border-radius:5p
 
     <!-- ROUTINE -->
     <section class="view" id="v-routine">
-      <div class="lists">
-        <div class="lnav">
-          <div id="routNav" class="lnav"></div>
-          <form class="add" id="newRoutForm" style="margin-top:6px">
-            <input type="text" id="newRoutName" placeholder="Nouvelle routine…" required maxlength="40" style="flex:1 1 140px">
-            <button class="btn" type="submit">Créer</button>
-          </form>
-        </div>
-        <div class="card" id="routCard"></div>
+      <div class="board" id="routBoard"></div>
+      <div class="card" style="margin-top:16px">
+        <h2>Ajouter une routine</h2>
+        <form id="routForm" class="rform">
+          <label>Routine<input type="text" id="routTitle" placeholder="ex. Se brosser les dents" required maxlength="60"></label>
+          <label>Qui ?<select id="routWho"></select></label>
+          <div class="row full" style="gap:16px;align-items:end">
+            <div><div class="small muted" style="margin-bottom:4px">Quand ?</div><div class="seg days" id="routDays" role="group" aria-label="Jours"></div></div>
+            <div><div class="small muted" style="margin-bottom:4px">Période</div><div class="seg" id="routPeriod" role="group" aria-label="Période"></div></div>
+          </div>
+          <div class="row full" style="gap:12px"><button class="btn" type="submit">Ajouter</button><span class="chip gold">+1 point par routine faite</span><span class="chip pen">−2 points si elle n'est pas cochée à la fin de la période</span></div>
+        </form>
+        <details style="margin-top:14px"><summary class="muted">Toutes les routines (<span id="routCount">0</span>)</summary><div id="routAll" style="margin-top:8px"></div></details>
       </div>
     </section>
 
@@ -485,8 +507,8 @@ code{font-size:15px;background:var(--surface-2);padding:1px 5px;border-radius:5p
 (function(){
 
 const COLORS = ["#3A7BD5","#D9544D","#2E9E6A","#9B59B6","#9C8AD8","#E08A1E","#1FA2A8","#C2477F","#6B7A8F"];   // #9C8AD8 = violet lavande
-const COLLS = ["members","chores","completions","rewards","shopping","todos","events","lists","menus","frog","routines"];
-const S = {members:[],chores:[],completions:[],rewards:[],shopping:[],todos:[],events:[],lists:[],menus:[],frog:[],routines:[]};
+const COLLS = ["members","chores","completions","rewards","shopping","todos","events","lists","menus","frog","kidRoutines"];
+const S = {members:[],chores:[],completions:[],rewards:[],shopping:[],todos:[],events:[],lists:[],menus:[],frog:[],kidRoutines:[]};
 let db = null, mcp = null, view = "taches", weekOffset = 0, pickedColor = COLORS[0];
 
 
@@ -545,7 +567,7 @@ function tick(){
 tick(); setInterval(tick, 20000);
 
 /* ---------- navigation ---------- */
-const TITLES = {routine:"Routine", taches:"Tâches & points", courses:"Liste de courses", todo:"À faire en famille", grenouille:"La grenouille", menus:"Menus de la semaine", listes:"Listes", agenda:"Agenda familial", reglages:"Réglages"};
+const TITLES = {routine:"Routines des enfants", taches:"Tâches & points", courses:"Liste de courses", todo:"À faire en famille", grenouille:"La grenouille", menus:"Menus de la semaine", listes:"Listes", agenda:"Agenda familial", reglages:"Réglages"};
 function go(v){
   view = v;
   document.querySelectorAll(".tab[data-view]").forEach(b => b.dataset.view === v ? b.setAttribute("aria-current","page") : b.removeAttribute("aria-current"));
@@ -1026,56 +1048,107 @@ $("#newListForm").addEventListener("submit", async e => {
   if(await put("lists", id, {name, items: [], order: S.lists.length, at: Date.now()})){ $("#newListName").value = ""; curList = id; try { localStorage.setItem("maisonnee.list", id); } catch(err){} renderListes(); }
 });
 
-/* ---------- routine (étapes cochées chaque jour, remises à zéro le lendemain) ---------- */
-let curRout = null; try { curRout = localStorage.getItem("maisonnee.routine"); } catch(e){}
-const sortedRouts = () => [...S.routines].sort((a,b) => (a.order ?? 0) - (b.order ?? 0) || a.at - b.at);
-const stepDone = s => s.doneOn === today();
+/* ---------- routines des enfants (par jour et par période, 1 point chacune) ---------- */
+const RPER = [{k:"matin", label:"Matin", from:6, to:12}, {k:"ecole", label:"Retour d'école", from:12, to:19}, {k:"soir", label:"Soir", from:19, to:23}];
+const RDAYS = [[1,"Lu"],[2,"Ma"],[3,"Me"],[4,"Je"],[5,"Ve"],[6,"Sa"],[0,"Di"]];
+const kids = () => sortedMembers().filter(m => memberRole(m) === "enfant");
+const nowPeriod = () => { const h = new Date().getHours(); const p = RPER.find(p => h >= p.from && h < p.to); return p ? p.k : ""; };
+const routDone = r => r.lastDone === today();
+const daysLabel = ds => ds.length === 7 ? "tous les jours" : RDAYS.filter(([d]) => ds.includes(d)).map(([, l]) => l).join(" ");
+let routDaysSel = [1,2,3,4,5,6,0], routPerSel = "matin";
+const ROUT_PENALTY = 2;
+// fin de la période d'une routine pour un jour donné (Date)
+const periodEnd = (r, d) => { const p = RPER.find(p => p.k === r.period) || RPER[2]; const e = new Date(d); e.setHours(p.to, 0, 0, 0); return e; };
+const routOver = r => Date.now() >= periodEnd(r, new Date()).getTime();
+function routRow(r){
+  const done = routDone(r), missed = !done && routOver(r), locked = routOver(r);
+  return `<div class="chore${done ? " done" : ""}${missed ? " missed" : ""}">
+    <button class="check" type="button" data-kroute="${esc(r.id)}" ${locked ? "disabled" : ""} aria-label="${done ? "Annuler" : "Marquer comme fait"} : ${esc(r.title)}"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg></button>
+    <div class="grow"><div class="ctitle">${esc(r.title)}</div>${missed ? `<div class="small minus">Oubliée</div>` : ""}</div>${missed ? `<span class="chip pen">−${ROUT_PENALTY}</span>` : `<span class="chip gold">+1</span>`}</div>`;
+}
+/* Pénalité automatique : à la fin de chaque période, −2 points par routine non cochée.
+   Chaque routine retient le dernier jour vérifié (checkedTo), donc une période passée pendant
+   que l'appli était fermée est rattrapée au prochain lancement, et jamais comptée deux fois
+   (l'identifiant de la pénalité est fixe : pen-<routine>-<jour>). Rattrapage limité à 7 jours. */
+let penRunning = false;
+async function applyRoutinePenalties(){
+  if(penRunning || !S.kidRoutines.length) return; penRunning = true;
+  try {
+    const now = Date.now(), floor = new Date(); floor.setHours(0,0,0,0); floor.setDate(floor.getDate() - 7);
+    for(const r of [...S.kidRoutines]){
+      if(!member(r.memberId)) continue;
+      const created = new Date(r.at || now);
+      let d = r.checkedTo ? new Date(r.checkedTo + "T00:00:00") : new Date(created.getFullYear(), created.getMonth(), created.getDate() - 1);
+      d.setDate(d.getDate() + 1); if(d < floor) d = new Date(floor);
+      let last = null;
+      for(; periodEnd(r, d).getTime() <= now; d.setDate(d.getDate() + 1)){
+        const day = dstr(d), end = periodEnd(r, d).getTime();
+        last = day;
+        if(!(r.days || []).includes(d.getDay()) || end <= (r.at || 0)) continue;   // pas prévue ce jour-là, ou créée après la fin de la période
+        const done = r.lastDone === day || S.completions.some(c => c.type === "routine" && c.routineId === r.id && c.day === day);
+        const pid = "pen-" + r.id + "-" + day;
+        if(!done && !S.completions.some(c => c.id === pid))
+          await put("completions", pid, {type:"penalty", routineId:r.id, title:"Routine oubliée : " + r.title, memberId:r.memberId, points:-ROUT_PENALTY, at:end, day});
+      }
+      if(last && last !== r.checkedTo) await patch("kidRoutines", r.id, {checkedTo: last});
+    }
+  } finally { penRunning = false; }
+}
 function renderRoutine(){
-  const rs = sortedRouts();
-  if(!rs.some(r => r.id === curRout)) curRout = rs[0] ? rs[0].id : null;
-  $("#routNav").innerHTML = rs.map(r => { const st = r.steps || []; const d = st.filter(stepDone).length;
-    return `<button class="lbtn" type="button" data-rout="${esc(r.id)}" aria-current="${r.id === curRout}">${esc(r.name)}<span class="n">${d}/${st.length}</span></button>`; }).join("");
-  const r = rs.find(x => x.id === curRout), card = $("#routCard");
-  if(!r){ card.innerHTML = `<h2>Aucune routine</h2><p class="muted">Créez une routine à gauche : matin, retour d'école, coucher… Les cases se décochent toutes seules chaque nuit.</p>`; return; }
-  const steps = r.steps || [], done = steps.filter(stepDone).length;
-  const keep = document.activeElement && document.activeElement.id === "stepText" ? $("#stepText").value : null;
-  card.innerHTML = `<div class="row"><h2 class="grow">${esc(r.name)}</h2>
-      <button class="btn ghost" type="button" id="routRename">Renommer</button>
-      <button class="btn danger" type="button" id="routDelete">Supprimer</button></div>
-    <div class="bar"><i style="width:${steps.length ? Math.round(100*done/steps.length) : 0}%"></i></div>
-    <div class="small muted">${steps.length ? (done === steps.length ? "Bravo, tout est fait aujourd'hui !" : `${done} sur ${steps.length} fait${done > 1 ? "es" : "e"} aujourd'hui`) : "Aucune étape"}</div>
-    <form class="add" id="stepForm" style="margin:14px 0 6px"><input type="text" id="stepText" placeholder="Ajouter une étape (ex. se brosser les dents)" required maxlength="80"><button class="btn" type="submit">Ajouter</button></form>
-    <div>${steps.map((s, i) => `<div class="item${stepDone(s) ? " done" : ""}">
-      <button class="check" type="button" data-rstep="${esc(s.id)}" aria-label="Cocher ${esc(s.text)}"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg></button>
-      <div class="t">${esc(s.text)}</div>
-      <button class="icon-btn" type="button" data-rup="${esc(s.id)}" aria-label="Monter" ${i ? "" : "disabled"}>↑</button>
-      <button class="icon-btn" type="button" data-delrstep="${esc(s.id)}" aria-label="Supprimer">×</button></div>`).join("") || `<div class="empty">Ajoutez les étapes, dans l'ordre.</div>`}</div>
-    <div class="row" style="margin-top:14px"><button class="btn ghost" type="button" id="routReset" ${done ? "" : "disabled"}>Tout décocher</button></div>`;
-  if(keep !== null){ $("#stepText").value = keep; $("#stepText").focus(); }
-  const saveSteps = st => patch("routines", r.id, {steps: st});
-  $("#stepForm").onsubmit = async e => { e.preventDefault(); const t = $("#stepText").value.trim(); if(!t) return;
-    $("#stepText").value = ""; await saveSteps([...steps, {id: uid(), text: t, doneOn: ""}]); $("#stepText").focus(); };
-  $("#routReset").onclick = () => saveSteps(steps.map(s => ({...s, doneOn: ""})));
-  $("#routDelete").onclick = () => confirmBox(`Supprimer la routine « ${r.name} » ?`, "Supprimer", () => del("routines", r.id));
-  $("#routRename").onclick = () => {
-    const ov = modal(`<h2>Renommer la routine</h2><input type="text" id="renameIn" maxlength="40" value="${esc(r.name)}"><div class="row"><button class="btn" type="button" id="renameOk">Enregistrer</button><button class="btn ghost" type="button" data-close>Annuler</button></div>`);
-    ov.querySelector("#renameOk").onclick = () => { const v = ov.querySelector("#renameIn").value.trim(); if(v){ closeModal(); patch("routines", r.id, {name: v}); } };
-  };
+  const ks = kids(), dow = new Date().getDay(), np = nowPeriod(), board = $("#routBoard");
+  if(!ks.length){
+    board.innerHTML = `<div class="card"><h2>Aucun enfant</h2><p class="muted">Ajoutez les enfants dans <b>Réglages</b> (type « Enfant »), puis créez leurs routines ci-dessous.</p></div>`;
+  } else {
+    board.innerHTML = ks.map(m => {
+      const mine = S.kidRoutines.filter(r => r.memberId === m.id && (r.days || []).includes(dow));
+      const left = mine.filter(r => !routDone(r) && !routOver(r)).length;
+      return `<div class="card mcard" style="--mc:${esc(m.color)}">
+        <div class="mhead">${avatar(m)}<div><h2>${esc(m.name)}</h2><div class="small muted">${mine.length ? (left ? `${left} routine${left > 1 ? "s" : ""} à faire` : "Tout est fait !") : "Rien aujourd'hui"}</div></div>
+          <div class="pts"><b>${points(m.id)}</b><span>points</span></div></div>
+        ${RPER.map(p => { const list = mine.filter(r => r.period === p.k).sort((a,b) => routDone(a) - routDone(b) || a.title.localeCompare(b.title));
+          return `<div class="rper${p.k === np ? " now" : ""}"><h3>${p.label} <span>${p.from}h – ${p.to}h</span></h3>${list.map(routRow).join("") || `<div class="empty">Rien</div>`}</div>`; }).join("")}
+      </div>`;
+    }).join("");
+  }
+  // formulaire
+  const who = $("#routWho"), cur = who.value;
+  who.innerHTML = (ks.length > 1 ? `<option value="*">Tous les enfants</option>` : "") + ks.map(m => `<option value="${esc(m.id)}">${esc(m.name)}</option>`).join("");
+  if([...who.options].some(o => o.value === cur)) who.value = cur;
+  $("#routDays").innerHTML = RDAYS.map(([d, l]) => `<button type="button" data-rday="${d}" aria-pressed="${routDaysSel.includes(d)}">${l}</button>`).join("");
+  $("#routPeriod").innerHTML = RPER.map(p => `<button type="button" data-rper="${p.k}" aria-pressed="${p.k === routPerSel}">${p.label}</button>`).join("");
+  const all = [...S.kidRoutines].sort((a,b) => (member(a.memberId)?.name || "").localeCompare(member(b.memberId)?.name || "") || RPER.findIndex(p => p.k === a.period) - RPER.findIndex(p => p.k === b.period) || a.title.localeCompare(b.title));
+  $("#routCount").textContent = all.length;
+  $("#routAll").innerHTML = all.map(r => { const m = member(r.memberId); const p = RPER.find(p => p.k === r.period);
+    return `<div class="hist">${avatar(m, true)}<div class="grow"><b>${esc(r.title)}</b><div class="small muted">${esc(m ? m.name : "?")} · ${p ? p.label : ""} · ${daysLabel(r.days || [])}</div></div>
+      <button class="icon-btn" type="button" data-delkroute="${esc(r.id)}" aria-label="Supprimer la routine">×</button></div>`; }).join("") || `<div class="empty">Aucune routine pour l'instant.</div>`;
+}
+async function toggleRoutine(r){
+  if(routDone(r)){
+    if(r.lastCompletion) await del("completions", r.lastCompletion);
+    await patch("kidRoutines", r.id, {lastDone: null, lastCompletion: null}); return;
+  }
+  const id = uid();
+  if(await put("completions", id, {type:"routine", routineId:r.id, title:"Routine : " + r.title, memberId:r.memberId, points:1, at:Date.now(), day:today()})){
+    await patch("kidRoutines", r.id, {lastDone: today(), lastCompletion: id}); const m = member(r.memberId); toast(`Bravo ${m ? m.name : ""} ! +1 point`);
+  }
 }
 document.addEventListener("click", e => {
-  const b = e.target.closest("[data-rout]"); if(b){ curRout = b.dataset.rout; try { localStorage.setItem("maisonnee.routine", curRout); } catch(err){} renderRoutine(); return; }
-  const r = S.routines.find(x => x.id === curRout); if(!r) return;
-  const st = r.steps || [];
-  const c = e.target.closest("[data-rstep]"); if(c){ patch("routines", r.id, {steps: st.map(s => s.id === c.dataset.rstep ? {...s, doneOn: stepDone(s) ? "" : today()} : s)}); return; }
-  const u = e.target.closest("[data-rup]"); if(u){ const i = st.findIndex(s => s.id === u.dataset.rup); if(i > 0){ const n = [...st]; [n[i-1], n[i]] = [n[i], n[i-1]]; patch("routines", r.id, {steps: n}); } return; }
-  const d = e.target.closest("[data-delrstep]"); if(d){ patch("routines", r.id, {steps: st.filter(s => s.id !== d.dataset.delrstep)}); }
+  const c = e.target.closest("[data-kroute]"); if(c){ const r = S.kidRoutines.find(x => x.id === c.dataset.kroute); if(r && !routOver(r)) toggleRoutine(r); return; }
+  const d = e.target.closest("[data-delkroute]"); if(d){ const r = S.kidRoutines.find(x => x.id === d.dataset.delkroute); if(r) confirmBox(`Supprimer la routine « ${r.title} » ?`, "Supprimer", () => del("kidRoutines", r.id)); return; }
+  const dy = e.target.closest("[data-rday]"); if(dy){ const n = +dy.dataset.rday; routDaysSel = routDaysSel.includes(n) ? routDaysSel.filter(x => x !== n) : [...routDaysSel, n]; renderRoutine(); return; }
+  const pr = e.target.closest("[data-rper]"); if(pr){ routPerSel = pr.dataset.rper; renderRoutine(); }
 });
-$("#newRoutForm").addEventListener("submit", async e => {
-  e.preventDefault(); const name = $("#newRoutName").value.trim(); if(!name) return;
-  const id = uid();
-  if(await put("routines", id, {name, steps: [], order: S.routines.length, at: Date.now()})){ $("#newRoutName").value = ""; curRout = id; try { localStorage.setItem("maisonnee.routine", id); } catch(err){} renderRoutine(); }
+$("#routForm").addEventListener("submit", async e => {
+  e.preventDefault(); const title = $("#routTitle").value.trim(), who = $("#routWho").value;
+  if(!title) return;
+  if(!who){ toast("Ajoutez d'abord les enfants dans Réglages"); return; }
+  if(!routDaysSel.length){ toast("Choisissez au moins un jour"); return; }
+  const ids = who === "*" ? kids().map(m => m.id) : [who];
+  for(const mid of ids) await put("kidRoutines", uid(), {title, memberId: mid, days: [...routDaysSel], period: routPerSel, points: 1, at: Date.now()});
+  $("#routTitle").value = ""; toast(ids.length > 1 ? `Routine ajoutée pour ${ids.length} enfants` : "Routine ajoutée");
 });
-setInterval(() => { if(view === "routine") renderRoutine(); }, 60000);
+setInterval(() => { applyRoutinePenalties(); if(view === "routine") renderRoutine(); }, 60000);
+setTimeout(applyRoutinePenalties, 3000);
 
 /* ---------- agenda (Google Agenda intégré) ---------- */
 let calMode = "WEEK", lastCalUrl = "";
