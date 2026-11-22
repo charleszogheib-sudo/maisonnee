@@ -421,6 +421,7 @@ code{font-size:15px;background:var(--surface-2);padding:1px 5px;border-radius:5p
         <div id="memberList"></div>
         <form class="add" id="memberForm" style="margin-top:14px">
           <input type="text" id="memberName" placeholder="Prénom" required maxlength="24">
+          <div id="memberRoleBox"></div>
           <div class="swatches" id="swatches"></div>
           <button class="btn" type="submit">Ajouter ce membre</button>
         </form>
@@ -503,6 +504,12 @@ const member = id => S.members.find(m => m.id === id);
 const fmtDay = new Intl.DateTimeFormat("fr-FR",{weekday:"long", day:"numeric", month:"long"});
 const fmtShort = new Intl.DateTimeFormat("fr-FR",{weekday:"short"});
 const fmtTime = new Intl.DateTimeFormat("fr-FR",{hour:"2-digit", minute:"2-digit"});
+// Rôle de chaque membre : "enfant" ou "parent". Les membres créés avant ce réglage
+// sont devinés d'après les prénoms des enfants (Eliott, Aydan, Wyatt, June), sinon parent.
+const KNOWN_KIDS = ["eliott","aydan","wyatt","june"];
+const memberRole = m => m && (m.role === "enfant" || m.role === "parent") ? m.role : (m && KNOWN_KIDS.includes(fnorm(m.name)) ? "enfant" : "parent");
+const ROLE_LABEL = {enfant:"Enfant", parent:"Parent"};
+const roleSeg = (id, role) => `<div class="seg" role="group" aria-label="Enfant ou parent" id="${id}">${["enfant","parent"].map(r => `<button type="button" data-role="${r}" aria-pressed="${r === role}">${ROLE_LABEL[r]}</button>`).join("")}</div>`;
 const sortedMembers = () => [...S.members].sort((a,b)=>(a.order??0)-(b.order??0) || a.name.localeCompare(b.name));
 
 function toast(msg){
@@ -1210,9 +1217,10 @@ $("#gsSave").addEventListener("click", async () => {
 /* ---------- réglages ---------- */
 function editMember(id){
   const m = member(id); if(!m) return;
-  let color = m.color;
+  let color = m.color, role = memberRole(m);
   const ov = modal(`<h2>Modifier ${esc(m.name)}</h2>
     <label class="label" for="emName">Prénom</label><input type="text" id="emName" maxlength="24" value="${esc(m.name)}">
+    <div class="label">Enfant ou parent</div>${roleSeg("emRole", role)}
     <div class="label">Couleur</div><div class="swatches" id="emSw"></div>
     <label class="label" for="emCal">Agenda Google</label><input type="text" id="emCal" value="${esc(m.calendarId || "")}" placeholder="ex. prenom@gmail.com" autocomplete="off" autocapitalize="off" spellcheck="false">
     <div class="row"><button class="btn ghost" type="button" id="emUp">Monter</button><button class="btn ghost" type="button" id="emDown">Descendre</button><span class="small muted">Ordre d'affichage</span></div>
@@ -1221,6 +1229,7 @@ function editMember(id){
   const drawSw = () => { sw.innerHTML = COLORS.map(c => `<button type="button" style="--mc:${c}" aria-label="Couleur" aria-pressed="${c === color}" data-c="${c}"></button>`).join(""); };
   drawSw();
   sw.addEventListener("click", e => { const b = e.target.closest("[data-c]"); if(b){ color = b.dataset.c; drawSw(); } });
+  ov.querySelector("#emRole").addEventListener("click", e => { const b = e.target.closest("[data-role]"); if(b){ role = b.dataset.role; ov.querySelectorAll("#emRole [data-role]").forEach(x => x.setAttribute("aria-pressed", x.dataset.role === role)); } });
   const move = async dir => {
     const ms = sortedMembers(); const i = ms.findIndex(x => x.id === id), j = i + dir;
     if(j < 0 || j >= ms.length) return;
@@ -1233,7 +1242,7 @@ function editMember(id){
   ov.querySelector("#emOk").onclick = async () => {
     const name = ov.querySelector("#emName").value.trim(); if(!name){ toast("Le prénom ne peut pas être vide"); return; }
     const cal = ov.querySelector("#emCal").value.trim();
-    if(await patch("members", id, {name, color, calendarId: cal || null})){ closeModal(); toast("Modifications enregistrées"); if(cal !== (m.calendarId || "")) setTimeout(gsFetch, 300); }
+    if(await patch("members", id, {name, color, role, calendarId: cal || null})){ closeModal(); toast("Modifications enregistrées"); if(cal !== (m.calendarId || "")) setTimeout(gsFetch, 300); }
   };
 }
 
@@ -1244,7 +1253,7 @@ $("#swatches").addEventListener("click", e => { const b = e.target.closest("[dat
 function renderReglages(){
   const ms = sortedMembers();
   $("#memberList").innerHTML = ms.length ? ms.map(m => {
-    return `<div class="item" style="--mc:${esc(m.color)}">${avatar(m)}<div class="t"><b>${esc(m.name)}</b> <span class="small muted">· ${points(m.id)} pts</span></div>
+    return `<div class="item" style="--mc:${esc(m.color)}">${avatar(m)}<div class="t"><b>${esc(m.name)}</b> <span class="small muted">· ${ROLE_LABEL[memberRole(m)]} · ${points(m.id)} pts</span></div>
       <input type="text" data-cal="${esc(m.id)}" id="cal-${esc(m.id)}" value="${esc(m.calendarId||"")}" placeholder="Agenda Google (ex. prenom@gmail.com)" aria-label="Agenda Google de ${esc(m.name)}" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:1 1 240px">
       <button class="btn ghost" type="button" data-editmember="${esc(m.id)}">Modifier</button>
       <button class="icon-btn" type="button" data-delmember="${esc(m.id)}" aria-label="Retirer ${esc(m.name)}">×</button></div>`;
@@ -1252,9 +1261,13 @@ function renderReglages(){
   const rw = [...S.rewards].sort((a,b)=>a.cost-b.cost);
   $("#rewardAdmin").innerHTML = rw.length ? rw.map(r => `<div class="item"><span class="chip gold">${esc(r.cost)} pts</span><div class="t">${esc(r.title)}</div><button class="icon-btn" type="button" data-delreward="${esc(r.id)}" aria-label="Supprimer">×</button></div>`).join("") : `<div class="empty">Aucune récompense.</div>`;
 }
+let newRole = "enfant";
+const drawNewRole = () => { $("#memberRoleBox").innerHTML = roleSeg("memberRole", newRole); };
+drawNewRole();
+$("#memberRoleBox").addEventListener("click", e => { const b = e.target.closest("[data-role]"); if(b){ newRole = b.dataset.role; drawNewRole(); } });
 $("#memberForm").addEventListener("submit", async e => {
   e.preventDefault(); const name = $("#memberName").value.trim(); if(!name) return;
-  const ok = await put("members", uid(), {name, color:pickedColor, order:S.members.length, calendarId:null});
+  const ok = await put("members", uid(), {name, color:pickedColor, role:newRole, order:S.members.length, calendarId:null});
   if(ok){ $("#memberName").value = ""; const next = COLORS.find(c => !S.members.some(m=>m.color===c) && c!==pickedColor); if(next){ pickedColor = next; renderSwatches(); } }
 });
 $("#rewardForm").addEventListener("submit", async e => {
@@ -1350,7 +1363,6 @@ try {
 }
 
 /* ---------- contrôle du soir ---------- */
-var CTRL_DEFAULT_NAMES = ["eliott","aydan","wyatt","june"];
 function ctrlCfg(){
   let c = null; try { c = JSON.parse(localStorage.getItem("maisonnee.control") || "null"); } catch(e){}
   return c || {time:"19:00", ids:null, lastDay:null, lastId:null, log:[]};
@@ -1359,7 +1371,7 @@ function ctrlSave(c){ try { localStorage.setItem("maisonnee.control", JSON.strin
 var norm = t => (t||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim().toLowerCase();
 function ctrlIds(c){
   if(Array.isArray(c.ids)) return c.ids.filter(id => member(id));
-  return S.members.filter(m => CTRL_DEFAULT_NAMES.includes(norm(m.name))).map(m => m.id);   // par défaut : Eliott, Aydan, Wyatt et June
+  return S.members.filter(m => memberRole(m) === "enfant").map(m => m.id);   // par défaut : tous les enfants
 }
 function renderCtrl(){
   const c = ctrlCfg(), ids = ctrlIds(c);
