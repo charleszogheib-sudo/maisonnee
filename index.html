@@ -39,6 +39,8 @@ h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance;letter-spacing:-.
 nav.rail{background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:6px;padding-block:14px;padding-left:env(safe-area-inset-left,0px)}
 .brand{font-family:var(--display);font-weight:800;font-size:15px;text-align:center;line-height:1.05;padding:4px 6px 12px;color:var(--accent)}
 .tab{width:80px;border:0;background:none;border-radius:12px;padding:7px 4px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:13px;color:var(--muted)}
+.tab{position:relative}
+.badge{position:absolute;top:2px;right:12px;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:var(--danger);color:#fff;font-size:13px;font-weight:700;line-height:22px;text-align:center;font-variant-numeric:tabular-nums;box-shadow:0 0 0 2px var(--surface)}
 .tab svg{width:28px;height:28px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 .tab[aria-current="page"]{background:var(--accent);color:var(--accent-ink)}
 .rail .spacer{flex:1}
@@ -242,7 +244,7 @@ code{font-size:15px;background:var(--surface-2);padding:1px 5px;border-radius:5p
     <button class="tab" data-view="taches" aria-current="page"><svg viewBox="0 0 24 24"><path d="M4 12l5 5L20 6"/></svg>Tâches</button>
     <button class="tab" data-view="courses"><svg viewBox="0 0 24 24"><path d="M3 4h2l2.4 11h11L21 7H6.2"/><circle cx="9" cy="19.5" r="1.3"/><circle cx="17" cy="19.5" r="1.3"/></svg>Courses</button>
     <button class="tab" data-view="todo"><svg viewBox="0 0 24 24"><rect x="4" y="3.5" width="16" height="17" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>À faire</button>
-    <button class="tab" data-view="grenouille"><svg viewBox="0 0 24 24"><circle cx="7.5" cy="7" r="2.6"/><circle cx="16.5" cy="7" r="2.6"/><path d="M5.3 8.8C3.5 10.2 2.5 12.1 2.5 14.2c0 3.5 4.3 5.8 9.5 5.8s9.5-2.3 9.5-5.8c0-2.1-1-4-2.8-5.4"/><path d="M8.5 14.6c1 .9 2.2 1.4 3.5 1.4s2.5-.5 3.5-1.4"/><circle cx="7.5" cy="7" r=".7" fill="currentColor"/><circle cx="16.5" cy="7" r=".7" fill="currentColor"/></svg>Grenouille</button>
+    <button class="tab" data-view="grenouille"><svg viewBox="0 0 24 24"><circle cx="7.5" cy="7" r="2.6"/><circle cx="16.5" cy="7" r="2.6"/><path d="M5.3 8.8C3.5 10.2 2.5 12.1 2.5 14.2c0 3.5 4.3 5.8 9.5 5.8s9.5-2.3 9.5-5.8c0-2.1-1-4-2.8-5.4"/><path d="M8.5 14.6c1 .9 2.2 1.4 3.5 1.4s2.5-.5 3.5-1.4"/><circle cx="7.5" cy="7" r=".7" fill="currentColor"/><circle cx="16.5" cy="7" r=".7" fill="currentColor"/></svg>Grenouille<span class="badge" id="frogBadge" hidden></span></button>
     <button class="tab" data-view="menus"><svg viewBox="0 0 24 24"><path d="M7 3v8M5 3v5a2 2 0 0 0 4 0V3M7 11v10"/><path d="M17 21V3c-2 1.5-3 4-3 7h3"/></svg>Menus</button>
     <button class="tab" data-view="agenda"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Agenda</button>
     <button class="tab" data-view="reglages"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg>Réglages</button>
@@ -565,6 +567,8 @@ function tick(){
   const s = fmtDay.format(n); $("#clockDate").textContent = s.charAt(0).toUpperCase()+s.slice(1);
 }
 tick(); setInterval(tick, 20000);
+let renderedDay = today();
+setInterval(() => { if(today() !== renderedDay){ renderedDay = today(); if(typeof renderFrog === "function") renderFrog(); } }, 30000);   // minuit : la bulle repart à zéro
 
 /* ---------- navigation ---------- */
 const TITLES = {routine:"Routines des enfants", taches:"Tâches & points", courses:"Liste de courses", todo:"À faire en famille", grenouille:"La grenouille", menus:"Menus de la semaine", listes:"Listes", agenda:"Agenda familial", reglages:"Réglages"};
@@ -850,6 +854,10 @@ function renderFrog(){
     </div>`;
   }).join("");
   $("#frogKids").innerHTML = html;
+  // bulle sur l'icône : nombre d'enfants qui n'ont pas coché la case du jour
+  const missing = days.includes(td) ? FROG_KIDS.filter(name => { const d = S.frog.find(x => x.id === fnorm(name)); return !(d && d.days && d.days[td]); }).length : 0;
+  const bd = $("#frogBadge"); bd.hidden = !missing; bd.textContent = missing;
+  bd.title = missing ? missing + " enfant" + (missing > 1 ? "s n'ont" : " n'a") + " pas coché aujourd'hui" : "";
 }
 document.addEventListener("click", e => {
   const b = e.target.closest("[data-frog]"); if(!b || b.disabled) return;
