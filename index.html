@@ -225,7 +225,6 @@ code{font-size:15px;background:var(--surface-2);padding:1px 5px;border-radius:5p
     <button class="tab" data-view="todo"><svg viewBox="0 0 24 24"><rect x="4" y="3.5" width="16" height="17" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>À faire</button>
     <button class="tab" data-view="grenouille"><svg viewBox="0 0 24 24"><circle cx="7.5" cy="7" r="2.6"/><circle cx="16.5" cy="7" r="2.6"/><path d="M5.3 8.8C3.5 10.2 2.5 12.1 2.5 14.2c0 3.5 4.3 5.8 9.5 5.8s9.5-2.3 9.5-5.8c0-2.1-1-4-2.8-5.4"/><path d="M8.5 14.6c1 .9 2.2 1.4 3.5 1.4s2.5-.5 3.5-1.4"/><circle cx="7.5" cy="7" r=".7" fill="currentColor"/><circle cx="16.5" cy="7" r=".7" fill="currentColor"/></svg>Grenouille</button>
     <button class="tab" data-view="menus"><svg viewBox="0 0 24 24"><path d="M7 3v8M5 3v5a2 2 0 0 0 4 0V3M7 11v10"/><path d="M17 21V3c-2 1.5-3 4-3 7h3"/></svg>Menus</button>
-    <button class="tab" data-view="listes"><svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 5.5l1 1 2-2M4 11.5l1 1 2-2M4 17.5l1 1 2-2"/></svg>Listes</button>
     <button class="tab" data-view="agenda"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Agenda</button>
     <button class="tab" data-view="reglages"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg>Réglages</button>
     <div class="spacer"></div>
@@ -1231,7 +1230,7 @@ const scheduleRender = () => { if(!raf) raf = requestAnimationFrame(() => { raf 
 
 /* ---------- démarrage ---------- */
 renderSwatches();
-try { const v = localStorage.getItem("maisonnee.view"); if(v && TITLES[v]) go(v); } catch(e){}
+try { const v = localStorage.getItem("maisonnee.view"); if(v && TITLES[v] && document.querySelector(`.tab[data-view="${v}"]`)) go(v); } catch(e){}
 renderAll();
 
 /* ---------- stockage local (sur la tablette) ---------- */
